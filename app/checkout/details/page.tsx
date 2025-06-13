@@ -23,6 +23,7 @@ import {
   CalendarIcon
 } from "lucide-react";
 import { useStorageUrl } from "@/lib/utils";
+import { clearCheckoutSessionData } from "@/lib/utils";
 import Image from "next/image";
 import Spinner from "@/components/Spinner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -89,7 +90,7 @@ function DetailsContent() {
   const { user, isLoaded } = useUser();
   
   const eventId = searchParams.get("eventId") as Id<"events">;
-  const waitingListId = searchParams.get("waitingListId") as Id<"waitingList">;
+  const waitingListId = searchParams.get("waitingListId") as Id<"waiting_list">;
   
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -100,37 +101,34 @@ function DetailsContent() {
     buyerEmail: "",
     buyerPhone: "",
     buyerCountryCode: "+60",
-    ticketHolders: [{
-      fullName: "",
-      email: "",
-      phone: "",
-      countryCode: "+60",
-      icPassport: "",
-      dateOfBirth: "",
-      gender: "",
-      country: "Malaysia",
-      state: "",
-      address: "",
-      postcode: "",
-      ticketType: "General Admission"
-    }],
+    ticketHolders: [],
     specialRequests: "",
     marketingEmails: true,
     eventUpdates: true
   });
 
-  const event = useQuery(api.events.getById, { eventId });
+  const event = useQuery(api.events.getById, { event_id: eventId });
   const queuePosition = useQuery(api.waitingList.getQueuePosition, {
-    eventId,
-    userId: user?.id ?? "",
+    event_id: eventId,
+    user_id: user?.id ?? "",
   });
   
-  const imageUrl = useStorageUrl(event?.imageStorageId);
+  const imageUrl = useStorageUrl(event?.image_storage_id);
 
   // Calculate offer validity
   const hasValidOffer = queuePosition?.status === "offered";
-  const offerExpiresAt = queuePosition?.offerExpiresAt ?? 0;
+  const offerExpiresAt = queuePosition?.offer_expires_at ?? 0;
   const isExpired = Date.now() > offerExpiresAt;
+
+  // Handle timer expiration
+  useEffect(() => {
+    if (hasValidOffer && isExpired) {
+      // Clear all session storage data when timer expires
+      clearCheckoutSessionData();
+      // Redirect to event page when timer expires
+      router.push(`/event/${eventId}`);
+    }
+  }, [hasValidOffer, isExpired, eventId, router]);
 
   useEffect(() => {
     if (!hasValidOffer || isExpired) return;
@@ -139,6 +137,10 @@ function DetailsContent() {
       const diff = offerExpiresAt - Date.now();
       if (diff <= 0) {
         setTimeRemaining("Expired");
+        // Clear all session storage data when timer reaches zero
+        clearCheckoutSessionData();
+        // Redirect when timer reaches zero
+        router.push(`/event/${eventId}`);
         return;
       }
 
@@ -155,7 +157,7 @@ function DetailsContent() {
     calculateTimeRemaining();
     const interval = setInterval(calculateTimeRemaining, 1000);
     return () => clearInterval(interval);
-  }, [offerExpiresAt, hasValidOffer, isExpired]);
+  }, [offerExpiresAt, hasValidOffer, isExpired, eventId, router]);
 
   // Load existing form data from session storage
   useEffect(() => {
@@ -165,21 +167,61 @@ function DetailsContent() {
         const data = JSON.parse(storedData) as PurchaseFormData;
         setFormData(data);
       } catch (error) {
-        console.error('Error parsing stored checkout data:', error);
+        // Silently handle parsing errors
       }
     }
   }, []);
 
+  // Initialize ticket holders based on queue quantity
+  useEffect(() => {
+    if (queuePosition?.quantity && formData.ticketHolders.length === 0) {
+      const ticketHolders = Array.from({ length: queuePosition.quantity }, () => ({
+        fullName: "",
+        email: "",
+        phone: "",
+        countryCode: "+60",
+        icPassport: "",
+        dateOfBirth: "",
+        gender: "",
+        country: "Malaysia",
+        state: "",
+        address: "",
+        postcode: "",
+        ticketType: "General Admission"
+      }));
+
+      setFormData(prev => ({
+        ...prev,
+        ticketHolders
+      }));
+    }
+  }, [queuePosition?.quantity, formData.ticketHolders.length]);
+
   // Auto-populate buyer info if not already filled
   useEffect(() => {
     if (user && formData.buyerFullName === "") {
+      // Extract phone number without country code if it's Malaysian (+60)
+      const primaryPhone = user.primaryPhoneNumber?.phoneNumber || "";
+      let phoneNumber = "";
+      
+      if (primaryPhone) {
+        // If phone starts with +60, remove it to get local format (we'll show +60 as fixed prefix)
+        if (primaryPhone.startsWith("+60")) {
+          phoneNumber = primaryPhone.substring(3);
+        } else {
+          // For other country codes, keep the full number but remove the +
+          phoneNumber = primaryPhone.startsWith("+") ? primaryPhone.substring(1) : primaryPhone;
+        }
+      }
+
       setFormData(prev => ({
         ...prev,
         buyerFullName: `${user.firstName || ""} ${user.lastName || ""}`.trim(),
         buyerEmail: user.emailAddresses[0]?.emailAddress || "",
+        buyerPhone: phoneNumber,
       }));
     }
-  }, [user?.id, user?.firstName, user?.lastName, user?.emailAddresses]); // Only depend on user properties, not formData
+  }, [user?.id, user?.firstName, user?.lastName, user?.emailAddresses, user?.primaryPhoneNumber]); // Only depend on user properties, not formData
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -189,10 +231,9 @@ function DetailsContent() {
     if (!formData.buyerEmail.trim()) newErrors.buyerEmail = "Email is required";
     if (!formData.buyerPhone.trim()) newErrors.buyerPhone = "Phone number is required";
 
-    // Validate Malaysian phone format (011xxxxxxx or 01xxxxxxxx)
-    const phoneRegex = /^01[0-9]{8,9}$/;
-    if (formData.buyerPhone && !phoneRegex.test(formData.buyerPhone)) {
-      newErrors.buyerPhone = "Please enter a valid Malaysian phone number (e.g., 0123456789)";
+    // Validate phone format - no leading 0
+    if (formData.buyerPhone && formData.buyerPhone.startsWith('0')) {
+      newErrors.buyerPhone = "Please enter phone number without leading 0 (e.g., 123456789)";
     }
 
     // Validate ticket holders
@@ -207,9 +248,9 @@ function DetailsContent() {
       if (!holder.address.trim()) newErrors[`holder_${index}_address`] = "Address is required";
       if (!holder.postcode.trim()) newErrors[`holder_${index}_postcode`] = "Postcode is required";
 
-      // Validate ticket holder phone
-      if (holder.phone && !phoneRegex.test(holder.phone)) {
-        newErrors[`holder_${index}_phone`] = "Please enter a valid Malaysian phone number (e.g., 0123456789)";
+      // Validate ticket holder phone - no leading 0
+      if (holder.phone && holder.phone.startsWith('0')) {
+        newErrors[`holder_${index}_phone`] = "Please enter phone number without leading 0 (e.g., 123456789)";
       }
     });
 
@@ -258,7 +299,7 @@ function DetailsContent() {
   if (!user) {
     window.location.href = '/sign-in';
     return <Spinner />;
-  }
+    }
 
   if (!event) {
     return <Spinner />;
@@ -266,8 +307,7 @@ function DetailsContent() {
 
   // Redirect if user doesn't have valid offer
   if (!queuePosition || queuePosition.status !== "offered" || isExpired) {
-    router.push(`/event/${eventId}`);
-    return null;
+    return <Spinner />;
   }
 
   return (
@@ -370,6 +410,10 @@ function DetailsContent() {
 
                 <div className="space-y-2">
                   <Label htmlFor="buyerPhone">Phone Number *</Label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <span className="text-gray-500 text-sm">+60</span>
+                    </div>
                   <Input
                     id="buyerPhone"
                     type="tel"
@@ -378,9 +422,10 @@ function DetailsContent() {
                       const value = e.target.value.replace(/\s+/g, ''); // Remove spaces
                       setFormData(prev => ({ ...prev, buyerPhone: value }));
                     }}
-                    placeholder="0123456789"
-                    className={errors.buyerPhone ? "border-red-500" : ""}
+                      placeholder="123456789"
+                      className={`pl-12 ${errors.buyerPhone ? "border-red-500" : ""}`}
                   />
+                  </div>
                   {errors.buyerPhone && <p className="text-red-500 text-sm">{errors.buyerPhone}</p>}
                 </div>
               </CardContent>
@@ -428,6 +473,10 @@ function DetailsContent() {
 
                     <div className="space-y-2">
                       <Label htmlFor={`holder_${index}_phone`}>Phone Number *</Label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                          <span className="text-gray-500 text-sm">+60</span>
+                        </div>
                       <Input
                         id={`holder_${index}_phone`}
                         type="tel"
@@ -436,9 +485,10 @@ function DetailsContent() {
                           const value = e.target.value.replace(/\s+/g, ''); // Remove spaces
                           updateTicketHolder(index, 'phone', value);
                         }}
-                        placeholder="0123456789"
-                        className={errors[`holder_${index}_phone`] ? "border-red-500" : ""}
+                          placeholder="123456789"
+                          className={`pl-12 ${errors[`holder_${index}_phone`] ? "border-red-500" : ""}`}
                       />
+                      </div>
                       {errors[`holder_${index}_phone`] && <p className="text-red-500 text-sm">{errors[`holder_${index}_phone`]}</p>}
                     </div>
 
@@ -627,11 +677,11 @@ function DetailsContent() {
                   <div className="space-y-2 text-sm text-gray-600">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
-                      <span>{new Date(event.eventDate).toLocaleDateString()}</span>
+                      <span>{new Date(event.event_date).toLocaleDateString()}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4" />
-                      <span>{new Date(event.eventDate).toLocaleTimeString()}</span>
+                      <span>{new Date(event.event_date).toLocaleTimeString()}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4" />
@@ -643,11 +693,11 @@ function DetailsContent() {
                 <Separator />
 
                 {/* Price Breakdown */}
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span>Ticket Price</span>
-                    <span>RM {event.price.toFixed(2)}</span>
-                  </div>
+                                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span>Ticket × {queuePosition.quantity}</span>
+                      <span>RM {(event.price * queuePosition.quantity).toFixed(2)}</span>
+                    </div>
                   <div className="flex justify-between text-sm">
                     <span>Service Fee</span>
                     <span>RM 0.00</span>
@@ -655,11 +705,19 @@ function DetailsContent() {
                   <Separator />
                   <div className="flex justify-between font-semibold">
                     <span>Total</span>
-                    <span>RM {event.price.toFixed(2)}</span>
+                    <span>RM {(event.price * queuePosition.quantity).toFixed(2)}</span>
                   </div>
                 </div>
 
                 <Separator />
+
+                {/* Countdown Timer */}
+                {hasValidOffer && !isExpired && (
+                  <div className="bg-red-50 p-3 rounded-lg text-center border border-red-200">
+                    <div className="text-sm text-red-700 mb-1">Queue expires in</div>
+                    <div className="text-lg font-bold text-red-900">{timeRemaining}</div>
+                  </div>
+                )}
 
                 {/* Navigation Buttons */}
                 <div className="space-y-3">

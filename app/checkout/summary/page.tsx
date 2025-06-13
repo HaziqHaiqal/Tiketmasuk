@@ -19,6 +19,7 @@ import {
   FileText,
 } from "lucide-react";
 import { useStorageUrl } from "@/lib/utils";
+import { clearCheckoutSessionData } from "@/lib/utils";
 import Image from "next/image";
 import Spinner from "@/components/Spinner";
 import { createToyyibPayCheckoutSession } from "@/app/actions/createToyyibPayCheckoutSession";
@@ -61,7 +62,7 @@ function SummaryContent() {
   const { user, isLoaded } = useUser();
   
   const eventId = searchParams.get("eventId") as Id<"events">;
-  const waitingListId = searchParams.get("waitingListId") as Id<"waitingList">;
+  const waitingListId = searchParams.get("waitingListId") as Id<"waiting_list">;
   
   const [isLoading, setIsLoading] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
@@ -69,18 +70,28 @@ function SummaryContent() {
   const [formData, setFormData] = useState<PurchaseFormData | null>(null);
   const [timeRemaining, setTimeRemaining] = useState("");
 
-  const event = useQuery(api.events.getById, { eventId });
+  const event = useQuery(api.events.getById, { event_id: eventId });
   const queuePosition = useQuery(api.waitingList.getQueuePosition, {
-    eventId,
-    userId: user?.id ?? "",
+    event_id: eventId,
+    user_id: user?.id ?? "",
   });
   
-  const imageUrl = useStorageUrl(event?.imageStorageId);
+  const imageUrl = useStorageUrl(event?.image_storage_id);
 
   // Calculate offer validity
   const hasValidOffer = queuePosition?.status === "offered";
-  const offerExpiresAt = queuePosition?.offerExpiresAt ?? 0;
+  const offerExpiresAt = queuePosition?.offer_expires_at ?? 0;
   const isExpired = Date.now() > offerExpiresAt;
+
+  // Handle timer expiration
+  useEffect(() => {
+    if (hasValidOffer && isExpired) {
+      // Clear all session storage data when timer expires
+      clearCheckoutSessionData();
+      // Redirect to event page when timer expires
+      router.push(`/event/${eventId}`);
+    }
+  }, [hasValidOffer, isExpired, eventId, router]);
 
   useEffect(() => {
     if (!hasValidOffer || isExpired) return;
@@ -89,6 +100,10 @@ function SummaryContent() {
       const diff = offerExpiresAt - Date.now();
       if (diff <= 0) {
         setTimeRemaining("Expired");
+        // Clear all session storage data when timer reaches zero
+        clearCheckoutSessionData();
+        // Redirect when timer reaches zero
+        router.push(`/event/${eventId}`);
         return;
       }
 
@@ -105,7 +120,7 @@ function SummaryContent() {
     calculateTimeRemaining();
     const interval = setInterval(calculateTimeRemaining, 1000);
     return () => clearInterval(interval);
-  }, [offerExpiresAt, hasValidOffer, isExpired]);
+  }, [offerExpiresAt, hasValidOffer, isExpired, eventId, router]);
 
   // Load form data from session storage
   useEffect(() => {
@@ -115,7 +130,6 @@ function SummaryContent() {
         const data = JSON.parse(storedData) as PurchaseFormData;
         setFormData(data);
       } catch (error) {
-        console.error('Error parsing stored checkout data:', error);
         // Redirect back to details if no data
         router.push(`/checkout/details?eventId=${eventId}&waitingListId=${waitingListId}&userType=authenticated`);
       }
@@ -143,12 +157,10 @@ function SummaryContent() {
       });
 
       // Clear stored data since we're proceeding to payment
-      sessionStorage.removeItem('checkoutData');
-      sessionStorage.removeItem('checkoutDetailsData');
+      clearCheckoutSessionData();
       
       window.location.href = response.paymentUrl;
     } catch (error) {
-      console.error("Payment error:", error);
       alert(error instanceof Error ? error.message : "Failed to proceed to payment");
       setIsLoading(false);
     }
@@ -177,8 +189,7 @@ function SummaryContent() {
 
   // Redirect if user doesn't have valid offer
   if (!queuePosition || queuePosition.status !== "offered" || isExpired) {
-    router.push(`/event/${eventId}`);
-    return null;
+    return <Spinner />;
   }
 
   const totalQuantity = formData.ticketHolders.length;
@@ -252,17 +263,17 @@ function SummaryContent() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
+                    <div>
                     <Label className="text-sm font-medium text-gray-600">Full Name</Label>
                     <p className="text-gray-900">{formData.buyerFullName}</p>
-                  </div>
-                  <div>
+                    </div>
+                    <div>
                     <Label className="text-sm font-medium text-gray-600">Email</Label>
                     <p className="text-gray-900">{formData.buyerEmail}</p>
                   </div>
-                  <div>
+                    <div>
                     <Label className="text-sm font-medium text-gray-600">Phone</Label>
-                    <p className="text-gray-900">{formData.buyerCountryCode} {formData.buyerPhone}</p>
+                    <p className="text-gray-900">+60{formData.buyerPhone}</p>
                   </div>
                 </div>
               </CardContent>
@@ -279,41 +290,41 @@ function SummaryContent() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
+                      <div>
                       <Label className="text-sm font-medium text-gray-600">Full Name</Label>
                       <p className="text-gray-900">{holder.fullName}</p>
-                    </div>
-                    <div>
+                      </div>
+                      <div>
                       <Label className="text-sm font-medium text-gray-600">Email</Label>
                       <p className="text-gray-900">{holder.email}</p>
-                    </div>
-                    <div>
+                      </div>
+                      <div>
                       <Label className="text-sm font-medium text-gray-600">Phone</Label>
-                      <p className="text-gray-900">{holder.countryCode} {holder.phone}</p>
-                    </div>
-                    <div>
+                      <p className="text-gray-900">+60{holder.phone}</p>
+                      </div>
+                      <div>
                       <Label className="text-sm font-medium text-gray-600">IC/Passport</Label>
                       <p className="text-gray-900">{holder.icPassport}</p>
-                    </div>
+                      </div>
                     <div>
                       <Label className="text-sm font-medium text-gray-600">Date of Birth</Label>
                       <p className="text-gray-900">{holder.dateOfBirth ? new Date(holder.dateOfBirth).toLocaleDateString() : "Not provided"}</p>
                     </div>
-                    <div>
+                      <div>
                       <Label className="text-sm font-medium text-gray-600">Gender</Label>
                       <p className="text-gray-900">{holder.gender}</p>
-                    </div>
-                    <div>
+                      </div>
+                      <div>
                       <Label className="text-sm font-medium text-gray-600">Country</Label>
                       <p className="text-gray-900">{holder.country}</p>
-                    </div>
+                      </div>
                     {holder.country === "Malaysia" && (
                       <div>
                         <Label className="text-sm font-medium text-gray-600">State</Label>
                         <p className="text-gray-900">{holder.state}</p>
                       </div>
                     )}
-                    <div>
+                        <div>
                       <Label className="text-sm font-medium text-gray-600">Postcode</Label>
                       <p className="text-gray-900">{holder.postcode}</p>
                     </div>
@@ -351,30 +362,30 @@ function SummaryContent() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center space-x-2">
-                  <Checkbox
+                                     <Checkbox
                     id="terms"
-                    checked={acceptTerms}
+                     checked={acceptTerms}
                     onCheckedChange={(checked) => setAcceptTerms(checked === true)}
-                  />
+                   />
                   <Label htmlFor="terms" className="text-sm font-normal">
                     I accept the{" "}
                     <a href="/terms" className="text-blue-600 hover:underline">
                       Terms and Conditions
                     </a>
-                  </Label>
+                    </Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Checkbox
+                                     <Checkbox
                     id="privacy"
-                    checked={acceptPrivacy}
+                     checked={acceptPrivacy}
                     onCheckedChange={(checked) => setAcceptPrivacy(checked === true)}
-                  />
+                   />
                   <Label htmlFor="privacy" className="text-sm font-normal">
                     I accept the{" "}
                     <a href="/privacy" className="text-blue-600 hover:underline">
                       Privacy Policy
                     </a>
-                  </Label>
+                    </Label>
                 </div>
               </CardContent>
             </Card>
@@ -405,11 +416,11 @@ function SummaryContent() {
                   <div className="space-y-2 text-sm text-gray-600">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
-                      <span>{new Date(event.eventDate).toLocaleDateString()}</span>
+                      <span>{new Date(event.event_date).toLocaleDateString()}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4" />
-                      <span>{new Date(event.eventDate).toLocaleTimeString()}</span>
+                      <span>{new Date(event.event_date).toLocaleTimeString()}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4" />
@@ -438,6 +449,14 @@ function SummaryContent() {
                 </div>
 
                 <Separator />
+
+                {/* Countdown Timer */}
+                {hasValidOffer && !isExpired && (
+                  <div className="bg-red-50 p-3 rounded-lg text-center border border-red-200">
+                    <div className="text-sm text-red-700 mb-1">Queue expires in</div>
+                    <div className="text-lg font-bold text-red-900">{timeRemaining}</div>
+                  </div>
+                )}
 
                 {/* Navigation Buttons */}
                 <div className="space-y-3">

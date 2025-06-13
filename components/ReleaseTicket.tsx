@@ -11,7 +11,7 @@ export default function ReleaseTicket({
   waitingListId,
 }: {
   eventId: Id<"events">;
-  waitingListId: Id<"waitingList">;
+  waitingListId: Id<"waiting_list">;
 }) {
   const [isReleasing, setIsReleasing] = useState(false);
   const releaseTicket = useMutation(api.waitingList.releaseTicket);
@@ -22,8 +22,8 @@ export default function ReleaseTicket({
     try {
       setIsReleasing(true);
       await releaseTicket({
-        eventId,
-        waitingListId,
+        event_id: eventId,
+        waiting_list_id: waitingListId,
       });
     } catch (error) {
       console.error("Error releasing ticket:", error);

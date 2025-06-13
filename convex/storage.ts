@@ -5,14 +5,19 @@ export const generateUploadUrl = mutation(async (ctx) => {
   return await ctx.storage.generateUploadUrl();
 });
 
+/**
+ * Updates an event with the given storage ID for the uploaded image.
+ * This function should be called after a successful image upload.
+ */
 export const updateEventImage = mutation({
   args: {
-    eventId: v.id("events"),
-    storageId: v.union(v.id("_storage"), v.null()),
+    event_id: v.id("events"),
+    storage_id: v.id("_storage"),
   },
-  handler: async (ctx, { eventId, storageId }) => {
-    await ctx.db.patch(eventId, {
-      imageStorageId: storageId ?? undefined,
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.event_id, {
+      image_storage_id: args.storage_id,
+      updated_at: Date.now(),
     });
   },
 });
@@ -28,5 +33,12 @@ export const deleteImage = mutation({
   args: { storageId: v.id("_storage") },
   handler: async (ctx, { storageId }) => {
     await ctx.storage.delete(storageId);
+  },
+});
+
+export const deleteFile = mutation({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, args) => {
+    await ctx.storage.delete(args.storageId);
   },
 });

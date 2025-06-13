@@ -18,12 +18,12 @@ export default function EventList() {
   }
 
   const upcomingEvents = events
-    .filter((event) => event.eventDate > Date.now())
-    .sort((a, b) => a.eventDate - b.eventDate);
+    .filter((event) => event.event_date > Date.now())
+    .sort((a, b) => a.event_date - b.event_date);
 
   const pastEvents = events
-    .filter((event) => event.eventDate <= Date.now())
-    .sort((a, b) => b.eventDate - a.eventDate);
+    .filter((event) => event.event_date <= Date.now())
+    .sort((a, b) => b.event_date - a.event_date);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

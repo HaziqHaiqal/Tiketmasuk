@@ -18,6 +18,7 @@ import {
   CheckCircle
 } from "lucide-react";
 import { useStorageUrl } from "@/lib/utils";
+import { clearCheckoutSessionData } from "@/lib/utils";
 import Image from "next/image";
 import Spinner from "@/components/Spinner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,23 +32,33 @@ function CartContent() {
   const { user, isLoaded } = useUser();
   
   const eventId = searchParams.get("eventId") as Id<"events">;
-  const waitingListId = searchParams.get("waitingListId") as Id<"waitingList">;
+  const waitingListId = searchParams.get("waitingListId") as Id<"waiting_list">;
   
   const [isLoading, setIsLoading] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState("");
 
-  const event = useQuery(api.events.getById, { eventId });
+  const event = useQuery(api.events.getById, { event_id: eventId });
   const queuePosition = useQuery(api.waitingList.getQueuePosition, {
-    eventId,
-    userId: user?.id ?? "",
+    event_id: eventId,
+    user_id: user?.id ?? "",
   });
   
-  const imageUrl = useStorageUrl(event?.imageStorageId);
+  const imageUrl = useStorageUrl(event?.image_storage_id);
 
   // Calculate offer validity
   const hasValidOffer = queuePosition?.status === "offered";
-  const offerExpiresAt = queuePosition?.offerExpiresAt ?? 0;
+  const offerExpiresAt = queuePosition?.offer_expires_at ?? 0;
   const isExpired = Date.now() > offerExpiresAt;
+
+  // Handle timer expiration
+  useEffect(() => {
+    if (hasValidOffer && isExpired) {
+      // Clear all session storage data when timer expires
+      clearCheckoutSessionData();
+      // Redirect to event page when timer expires
+      router.push(`/event/${eventId}`);
+    }
+  }, [hasValidOffer, isExpired, eventId, router]);
 
   useEffect(() => {
     if (!hasValidOffer || isExpired) return;
@@ -56,6 +67,10 @@ function CartContent() {
       const diff = offerExpiresAt - Date.now();
       if (diff <= 0) {
         setTimeRemaining("Expired");
+        // Clear all session storage data when timer reaches zero
+        clearCheckoutSessionData();
+        // Redirect when timer reaches zero
+        router.push(`/event/${eventId}`);
         return;
       }
 
@@ -72,7 +87,7 @@ function CartContent() {
     calculateTimeRemaining();
     const interval = setInterval(calculateTimeRemaining, 1000);
     return () => clearInterval(interval);
-  }, [offerExpiresAt, hasValidOffer, isExpired]);
+  }, [offerExpiresAt, hasValidOffer, isExpired, eventId, router]);
 
   const handleProceedToDetails = () => {
     if (!event) return;
@@ -107,8 +122,7 @@ function CartContent() {
 
   // Redirect if user doesn't have valid offer
   if (!queuePosition || queuePosition.status !== "offered" || isExpired) {
-    router.push(`/event/${eventId}`);
-    return null;
+    return <Spinner />;
   }
 
   return (
@@ -124,7 +138,7 @@ function CartContent() {
             Review your ticket selection before proceeding to checkout
           </p>
           {hasValidOffer && (
-            <Badge variant="secondary" className="mt-3 bg-amber-100 text-amber-800 hover:bg-amber-100">
+            <Badge variant="secondary" className="mt-3 bg-blue-100 text-blue-800 hover:bg-blue-100">
               <Clock className="w-3 h-3 mr-1" />
               Reserved • Expires in {timeRemaining}
             </Badge>
@@ -199,11 +213,11 @@ function CartContent() {
                       <div className="space-y-1 text-sm text-gray-600">
                         <div className="flex items-center gap-2">
                           <Calendar className="w-4 h-4" />
-                          <span>{new Date(event.eventDate).toLocaleDateString()}</span>
+                          <span>{new Date(event.event_date).toLocaleDateString()}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Clock className="w-4 h-4" />
-                          <span>{new Date(event.eventDate).toLocaleTimeString()}</span>
+                          <span>{new Date(event.event_date).toLocaleTimeString()}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <MapPin className="w-4 h-4" />
@@ -223,29 +237,19 @@ function CartContent() {
                         <p className="text-sm text-gray-600">Standard entry ticket</p>
                       </div>
                       <div className="text-right">
-                        <div className="font-semibold text-lg text-gray-900">RM {event.price.toFixed(2)}</div>
-                        <div className="text-sm text-gray-600">Qty: 1</div>
+                        <div className="font-semibold text-lg text-gray-900">RM {(event.price * queuePosition.quantity).toFixed(2)}</div>
+                        <div className="text-sm text-gray-600">Qty: {queuePosition.quantity}</div>
                       </div>
                     </div>
                   </div>
 
                   <Separator />
 
-                  {/* What's Included */}
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <h4 className="font-medium text-blue-900 mb-2">What's Included</h4>
-                    <ul className="text-sm text-blue-800 space-y-1">
-                      <li>• Entry to {event.name}</li>
-                      <li>• Access to all event activities</li>
-                      <li>• Official event materials</li>
-                      <li>• Customer support</li>
-                    </ul>
-                  </div>
 
                   {/* Important Notes */}
-                  <div className="bg-amber-50 p-4 rounded-lg">
-                    <h4 className="font-medium text-amber-900 mb-2">Important Notes</h4>
-                    <ul className="text-sm text-amber-800 space-y-1">
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <h4 className="font-medium text-orange-900 mb-2">Important Notes</h4>
+                    <ul className="text-sm text-orange-800 space-y-1">
                       <li>• Please bring valid ID for entry</li>
                       <li>• Tickets are non-refundable</li>
                       <li>• Event details may be subject to change</li>
@@ -270,11 +274,11 @@ function CartContent() {
                   <div className="space-y-2 text-sm text-gray-600">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
-                      <span>{new Date(event.eventDate).toLocaleDateString()}</span>
+                      <span>{new Date(event.event_date).toLocaleDateString()}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4" />
-                      <span>{new Date(event.eventDate).toLocaleTimeString()}</span>
+                      <span>{new Date(event.event_date).toLocaleTimeString()}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4" />
@@ -286,11 +290,11 @@ function CartContent() {
                 <Separator />
 
                 {/* Price Breakdown */}
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span>Ticket × 1</span>
-                    <span>RM {event.price.toFixed(2)}</span>
-                  </div>
+                                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span>Ticket × {queuePosition.quantity}</span>
+                      <span>RM {(event.price * queuePosition.quantity).toFixed(2)}</span>
+                    </div>
                   <div className="flex justify-between text-sm">
                     <span>Service Fee</span>
                     <span>RM 0.00</span>
@@ -298,7 +302,7 @@ function CartContent() {
                   <Separator />
                   <div className="flex justify-between font-semibold">
                     <span>Total</span>
-                    <span>RM {event.price.toFixed(2)}</span>
+                    <span>RM {(event.price * queuePosition.quantity).toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -306,22 +310,22 @@ function CartContent() {
 
                 {/* Countdown Timer */}
                 {hasValidOffer && !isExpired && (
-                  <div className="bg-amber-50 p-3 rounded-lg text-center">
-                    <div className="text-sm text-amber-800 mb-1">Offer expires in</div>
-                    <div className="text-lg font-bold text-amber-900">{timeRemaining}</div>
+                  <div className="bg-red-50 p-3 rounded-lg text-center border border-red-200">
+                    <div className="text-sm text-red-700 mb-1">Queue expires in</div>
+                    <div className="text-lg font-bold text-red-900">{timeRemaining}</div>
                   </div>
                 )}
 
                 {/* Security Notice */}
-                <div className="bg-green-50 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 text-green-800 text-sm">
+                {/* <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2 text-blue-800 text-sm">
                     <CheckCircle className="w-4 h-4" />
                     <span className="font-medium">Secure Checkout</span>
                   </div>
-                  <p className="text-green-700 text-xs mt-1">
+                  <p className="text-blue-700 text-xs mt-1">
                     Your payment information is protected with bank-level security
                   </p>
-                </div>
+                </div> */}
 
                 {/* Action Buttons */}
                 <div className="space-y-3">

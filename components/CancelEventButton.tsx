@@ -31,7 +31,7 @@ export default function CancelEventButton({
     setIsCancelling(true);
     try {
       await refundEventTickets(eventId);
-      await cancelEvent({ eventId });
+      await cancelEvent({ event_id: eventId });
       toast({
         title: "Event cancelled",
         description: "All tickets have been refunded successfully.",

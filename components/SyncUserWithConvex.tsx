@@ -15,9 +15,11 @@ export default function SyncUserWithConvex() {
     const syncUser = async () => {
       try {
         await updateUser({
-          userId: user.id,
-          name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim(),
-          email: user.emailAddresses[0]?.emailAddress ?? "",
+          user_id: user.id,
+          updates: {
+            name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim(),
+            email: user.emailAddresses[0]?.emailAddress ?? "",
+          },
         });
       } catch (error) {
         console.error("Error syncing user:", error);

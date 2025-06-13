@@ -21,12 +21,12 @@ export default function SearchPage() {
   }
 
   const upcomingEvents = searchResults
-    .filter((event) => event.eventDate > Date.now())
-    .sort((a, b) => a.eventDate - b.eventDate);
+    .filter((event) => event.event_date > Date.now())
+    .sort((a, b) => a.event_date - b.event_date);
 
   const pastEvents = searchResults
-    .filter((event) => event.eventDate <= Date.now())
-    .sort((a, b) => b.eventDate - a.eventDate);
+    .filter((event) => event.event_date <= Date.now())
+    .sort((a, b) => b.event_date - a.event_date);
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">

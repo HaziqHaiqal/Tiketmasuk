@@ -14,13 +14,17 @@ import Link from "next/link";
 import Spinner from "./Spinner";
 
 export default function TicketCard({ ticketId }: { ticketId: Id<"tickets"> }) {
-  const ticket = useQuery(api.tickets.getTicketWithDetails, { ticketId });
+  const ticket = useQuery(api.tickets.getTicketWithDetails, { ticket_id: ticketId });
 
   if (!ticket || !ticket.event) return <Spinner />;
 
-  const isPastEvent = ticket.event.eventDate < Date.now();
+  const isPastEvent = ticket.event.event_date < Date.now();
 
   const statusColors = {
+    pending: "bg-yellow-50 text-yellow-700 border-yellow-100",
+    issued: isPastEvent
+      ? "bg-gray-50 text-gray-600 border-gray-200"
+      : "bg-green-50 text-green-700 border-green-100",
     valid: isPastEvent
       ? "bg-gray-50 text-gray-600 border-gray-200"
       : "bg-green-50 text-green-700 border-green-100",
@@ -30,6 +34,8 @@ export default function TicketCard({ ticketId }: { ticketId: Id<"tickets"> }) {
   };
 
   const statusText = {
+    pending: "Pending",
+    issued: isPastEvent ? "Ended" : "Valid",
     valid: isPastEvent ? "Ended" : "Valid",
     used: "Used",
     refunded: "Refunded",
@@ -50,7 +56,7 @@ export default function TicketCard({ ticketId }: { ticketId: Id<"tickets"> }) {
               {ticket.event.name}
             </h3>
             <p className="text-sm text-gray-500 mt-1">
-              Purchased on {new Date(ticket.purchasedAt).toLocaleDateString()}
+              Purchased on {new Date(ticket.issued_at).toLocaleDateString()}
             </p>
             {ticket.event.is_cancelled && (
               <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
@@ -86,7 +92,7 @@ export default function TicketCard({ ticketId }: { ticketId: Id<"tickets"> }) {
               className={`w-4 h-4 mr-2 ${ticket.event.is_cancelled ? "text-red-600" : ""}`}
             />
             <span className="text-sm">
-              {new Date(ticket.event.eventDate).toLocaleDateString()}
+              {new Date(ticket.event.event_date).toLocaleDateString()}
             </span>
           </div>
           <div className="flex items-center text-gray-600">

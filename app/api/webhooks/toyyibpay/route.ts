@@ -33,43 +33,70 @@ export async function POST(req: NextRequest) {
 
     const convex = getConvexClient();
 
-    // Find the pending ticket by bill code
-    const ticket = await convex.query(api.tickets.getTicketByBillCode, {
-      billCode: billCode,
-    });
-
-    if (!ticket) {
-      console.error("Ticket not found for bill code:", billCode);
-      return new Response("Ticket not found", { status: 404 });
-    }
-
-    // Status ID 1 means successful payment
+    // Handle different payment statuses
     if (statusId === "1") {
-      console.log("Processing successful payment for ticket:", ticket._id);
-      
+      // Status 1: Successful payment - update payment and booking status
       try {
-        // Parse the metadata to get the waiting list ID
-        const metadata = JSON.parse(ticket.metadata || "{}");
-        
-        // Complete the pending ticket purchase
-        await convex.mutation(api.tickets.completePendingTicketPurchase, {
-          ticketId: ticket._id,
-          paymentIntentId: transactionId || orderId || billCode,
-          waitingListId: metadata.waitingListId,
+        await convex.mutation(api.payments.updatePaymentStatus, {
+          bill_code: billCode,
+          status: "completed",
+          transaction_reference: transactionId || orderId || billCode,
+          provider_response: {
+            billcode: billCode,
+            status_id: statusId,
+            order_id: orderId,
+            msg: msg,
+            transaction_id: transactionId
+          }
         });
 
-        console.log("Purchase completed successfully");
+        // Get the payment to find the booking
+        const payment = await convex.query(api.payments.getPaymentByBillCode, {
+          bill_code: billCode
+        });
+
+        if (payment) {
+          // Update booking status to completed
+          await convex.mutation(api.bookings.updateStatus, {
+            booking_id: payment.booking_id,
+            status: "completed"
+          });
+        }
       } catch (error) {
         console.error("Error processing successful payment:", error);
         return new Response("Error processing payment", { status: 500 });
       }
     } else {
-      console.log("Payment failed or cancelled, status:", statusId);
-      // Update ticket status to cancelled
-      await convex.mutation(api.tickets.updateTicketStatus, {
-        ticketId: ticket._id,
-        status: "cancelled",
-      });
+      // Status 0, 2, 3: Failed, cancelled, or other unsuccessful statuses
+      try {
+        await convex.mutation(api.payments.updatePaymentStatus, {
+          bill_code: billCode,
+          status: "failed",
+          provider_response: {
+            billcode: billCode,
+            status_id: statusId,
+            order_id: orderId,
+            msg: msg,
+            transaction_id: transactionId
+          }
+        });
+
+        // Get the payment to find the booking
+        const payment = await convex.query(api.payments.getPaymentByBillCode, {
+          bill_code: billCode
+        });
+
+        if (payment) {
+          // Update booking status to cancelled
+          await convex.mutation(api.bookings.updateStatus, {
+            booking_id: payment.booking_id,
+            status: "cancelled"
+          });
+        }
+      } catch (error) {
+        console.error("Error updating payment status:", error);
+        return new Response("Error updating payment", { status: 500 });
+      }
     }
 
     return new Response("OK", { status: 200 });

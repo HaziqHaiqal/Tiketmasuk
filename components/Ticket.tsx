@@ -16,11 +16,11 @@ import { useStorageUrl } from "@/lib/utils";
 import Image from "next/image";
 
 export default function Ticket({ ticketId }: { ticketId: Id<"tickets"> }) {
-  const ticket = useQuery(api.tickets.getTicketWithDetails, { ticketId });
-  const user = useQuery(api.users.getUserById, {
-    userId: ticket?.userId ?? "",
+  const ticket = useQuery(api.tickets.getTicketWithDetails, { ticket_id: ticketId });
+  const user = useQuery(api.users.get, {
+    user_id: ticket?.booking?.user_id ?? "",
   });
-  const imageUrl = useStorageUrl(ticket?.event?.imageStorageId);
+  const imageUrl = useStorageUrl(ticket?.event?.image_storage_id);
 
   if (!ticket || !ticket.event || !user) {
     return <Spinner />;
@@ -70,7 +70,7 @@ export default function Ticket({ ticketId }: { ticketId: Id<"tickets"> }) {
               <div>
                 <p className="text-sm text-gray-500">Date</p>
                 <p className="font-medium">
-                  {new Date(ticket.event.eventDate).toLocaleDateString()}
+                  {new Date(ticket.event.event_date).toLocaleDateString()}
                 </p>
               </div>
             </div>
@@ -102,7 +102,7 @@ export default function Ticket({ ticketId }: { ticketId: Id<"tickets"> }) {
               />
               <div>
                 <p className="text-sm text-gray-500">Ticket Holder ID</p>
-                <p className="font-medium">{user.userId}</p>
+                                  <p className="font-medium">{user.user_id}</p>
               </div>
             </div>
 
@@ -155,7 +155,7 @@ export default function Ticket({ ticketId }: { ticketId: Id<"tickets"> }) {
         className={`${ticket.event.is_cancelled ? "bg-red-50" : "bg-gray-50"} px-6 py-4 flex justify-between items-center`}
       >
         <span className="text-sm text-gray-500">
-          Purchase Date: {new Date(ticket.purchasedAt).toLocaleString()}
+                      Purchase Date: {new Date(ticket.issued_at).toLocaleString()}
         </span>
         <span
           className={`text-sm font-medium ${ticket.event.is_cancelled ? "text-red-600" : "text-blue-600"}`}

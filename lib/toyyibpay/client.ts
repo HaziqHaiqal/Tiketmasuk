@@ -64,7 +64,6 @@ export class ToyyibPayClient {
       }
 
       const responseText = await response.text();
-      console.log('ToyyibPay API raw response:', responseText);
       
       // Check for common error responses
       if (responseText.includes('disallowed characters')) {
@@ -81,7 +80,6 @@ export class ToyyibPayClient {
         result = JSON.parse(responseText);
         
         if (result && result.status === 'error') {
-          console.error('ToyyibPay API error:', result);
           throw new Error(`ToyyibPay API error: ${result.msg}`);
         }
       } catch (parseError) {
@@ -89,7 +87,6 @@ export class ToyyibPayClient {
         if (responseText && responseText.length > 0 && !responseText.includes('<') && !responseText.includes('error')) {
           result = [{ BillCode: responseText.trim() }];
         } else {
-          console.error('Invalid response from ToyyibPay API:', responseText);
           throw new Error('Invalid response from ToyyibPay API. Please check your API credentials and configuration.');
         }
       }
@@ -98,18 +95,14 @@ export class ToyyibPayClient {
         const billCode = result[0].BillCode;
         const paymentUrl = `${TOYYIBPAY_API_URL}/${billCode}`;
         
-        console.log('Successfully created bill:', billCode);
-        
         return {
           billCode,
           billpaymentURL: paymentUrl,
         };
       } else {
-        console.error('No bill code in response:', result);
         throw new Error('Failed to create bill: No bill code returned');
       }
     } catch (error) {
-      console.error('Error creating ToyyibPay bill:', error);
       throw error;
     }
   }
@@ -137,7 +130,6 @@ export class ToyyibPayClient {
       const result = await response.json();
       return Array.isArray(result) ? result : [];
     } catch (error) {
-      console.error('Error getting ToyyibPay bill transactions:', error);
       throw error;
     }
   }
@@ -164,7 +156,6 @@ export class ToyyibPayClient {
 
       return await response.json();
     } catch (error) {
-      console.error('Error deactivating ToyyibPay bill:', error);
       throw error;
     }
   }

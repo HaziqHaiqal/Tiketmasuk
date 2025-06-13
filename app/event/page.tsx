@@ -18,12 +18,12 @@ function EventPage() {
     const params = useParams();
     
     const event = useQuery(api.events.getById, {
-        eventId: params.id as Id<"events">,
+        event_id: params.id as Id<"events">,
     });
     const availability = useQuery(api.events.getEventAvailability, {
-        eventId: params.id as Id<"events">,
+        event_id: params.id as Id<"events">,
     });
-    const imageUrl = useStorageUrl(event?.imageStorageId);
+    const imageUrl = useStorageUrl(event?.image_storage_id);
 
     if (!event || !availability) {
         return (
@@ -67,7 +67,7 @@ function EventPage() {
                                             <span className="text-sm font-medium">Date</span>
                                         </div>
                                         <p className="text-gray-900">
-                                            {new Date(event.eventDate).toLocaleDateString()}
+                                            {new Date(event.event_date).toLocaleDateString()}
                                         </p>
                                     </div>
 

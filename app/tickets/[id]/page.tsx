@@ -14,7 +14,7 @@ export default function TicketPage() {
   const params = useParams();
   const { user } = useUser();
   const ticket = useQuery(api.tickets.getTicketWithDetails, {
-    ticketId: params.id as Id<"tickets">,
+    ticket_id: params.id as Id<"tickets">,
   });
 
   useEffect(() => {
@@ -22,7 +22,7 @@ export default function TicketPage() {
       redirect("/");
     }
 
-    if (!ticket || ticket.userId !== user.id) {
+    if (!ticket || ticket.booking?.user_id !== user.id) {
       redirect("/tickets");
     }
 
@@ -68,7 +68,7 @@ export default function TicketPage() {
               {ticket.event.name}
             </h1>
             <p className="mt-1 text-gray-600">
-              {new Date(ticket.event.eventDate).toLocaleDateString()} at{" "}
+              {new Date(ticket.event.event_date).toLocaleDateString()} at{" "}
               {ticket.event.location}
             </p>
             <div className="mt-4 flex items-center gap-4">
@@ -82,7 +82,7 @@ export default function TicketPage() {
                 {ticket.event.is_cancelled ? "Cancelled" : "Valid Ticket"}
               </span>
               <span className="text-sm text-gray-500">
-                Purchased on {new Date(ticket.purchasedAt).toLocaleDateString()}
+                Purchased on {new Date(ticket.issued_at).toLocaleDateString()}
               </span>
             </div>
             {ticket.event.is_cancelled && (

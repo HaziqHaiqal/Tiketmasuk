@@ -8,8 +8,8 @@ import { Ticket } from "lucide-react";
 
 export default function MyTicketsPage() {
   const { user } = useUser();
-  const tickets = useQuery(api.events.getUserTickets, {
-    userId: user?.id ?? "",
+  const tickets = useQuery(api.tickets.getUserTickets, {
+    user_id: user?.id ?? "",
   });
 
   if (!tickets) return null;
@@ -18,10 +18,10 @@ export default function MyTicketsPage() {
   const otherTickets = tickets.filter((t) => t.status !== "valid");
 
   const upcomingTickets = validTickets.filter(
-    (t) => t.event && t.event.eventDate > Date.now()
+    (t) => t.event && t.event.event_date > Date.now()
   );
   const pastTickets = validTickets.filter(
-    (t) => t.event && t.event.eventDate <= Date.now()
+    (t) => t.event && t.event.event_date <= Date.now()
   );
 
   return (

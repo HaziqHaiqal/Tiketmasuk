@@ -47,10 +47,18 @@ export type ToyyibPayCheckoutMetaData = {
   eventId: Id<"events">;
   userType: "authenticated";
   userId: string;
-  waitingListId: Id<"waitingList">;
+  waitingListId: Id<"waiting_list">;
   formData: PurchaseFormData;
   waiver: WaiverState;
+  bookingReference: string;
 };
+
+// Generate unique booking reference
+function generateBookingReference(): string {
+  const timestamp = Date.now().toString(36);
+  const randomStr = Math.random().toString(36).substring(2, 8);
+  return `TM${timestamp}${randomStr}`.toUpperCase();
+}
 
 export async function createToyyibPayCheckoutSession({
   eventId,
@@ -61,7 +69,7 @@ export async function createToyyibPayCheckoutSession({
 }: {
   eventId: Id<"events">;
   userType: "authenticated";
-  waitingListId?: Id<"waitingList">;
+  waitingListId?: Id<"waiting_list">;
   formData: PurchaseFormData;
   waiver: WaiverState;
 }) {
@@ -92,18 +100,21 @@ export async function createToyyibPayCheckoutSession({
   const convex = getConvexClient();
 
   // Get event details
-  const event = await convex.query(api.events.getById, { eventId });
+  const event = await convex.query(api.events.getById, { event_id: eventId });
   if (!event) throw new Error("Event not found");
 
   // Get waiting list entry for authenticated users
   const queuePosition = await convex.query(api.waitingList.getQueuePosition, {
-    eventId,
-    userId,
+    event_id: eventId,
+    user_id: userId,
   });
 
   if (!queuePosition || queuePosition.status !== "offered") {
     throw new Error("No valid ticket offer found");
   }
+
+  // Generate unique booking reference immediately
+  const bookingReference = generateBookingReference();
 
   const metadata: ToyyibPayCheckoutMetaData = {
     eventId,
@@ -111,7 +122,8 @@ export async function createToyyibPayCheckoutSession({
     userId,
     waitingListId: queuePosition._id,
     formData,
-    waiver
+    waiver,
+    bookingReference
   };
 
   // Calculate total price based on number of ticket holders
@@ -129,37 +141,71 @@ export async function createToyyibPayCheckoutSession({
       ? event.name.substring(0, maxEventNameLength - 3) + "..." 
       : event.name;
 
-    // Create ToyyibPay bill using the buyer's information
-    const billResponse = await toyyibpayClient.createBill({
+    // First get the vendor from the event to create the booking
+    const vendor = await convex.query(api.vendors.getByEvent, { event_id: eventId });
+    if (!vendor) throw new Error("Event vendor not found");
+
+    // Create booking record (not ticket) for tracking
+    const bookingId = await convex.mutation(api.bookings.create, {
+      booking_reference: bookingReference,
+      user_id: userId,
+      vendor_id: vendor._id,
+      total_amount: totalAmount,
+      notes: JSON.stringify(metadata)
+    });
+
+    // Format phone number for ToyyibPay (ensure it starts with +60)
+    let formattedPhone = formData.buyerPhone;
+    if (formData.buyerPhone && !formData.buyerPhone.startsWith('+')) {
+      // Remove leading 0 if present, then add +60 (Malaysian format)
+      const cleanPhone = formData.buyerPhone.startsWith('0') 
+        ? formData.buyerPhone.substring(1) 
+        : formData.buyerPhone;
+      formattedPhone = `+60${cleanPhone}`;
+    }
+    
+    // For development, use a placeholder HTTPS URL for callbacks since ToyyibPay might reject localhost
+    const callbackBaseUrl = process.env.NODE_ENV === "development" 
+      ? "https://tiketmasuk.vercel.app" // Use production URL for callbacks in dev
+      : baseUrl;
+
+    const billData = {
       billName: `Ticket: ${truncatedEventName}${quantityText}`,
-      billDescription: `${ticketQuantity} ticket(s) for ${event.name}`,
+      billDescription: `${ticketQuantity} ticket(s) for ${event.name} - Booking: ${bookingReference}`,
       billAmount: totalAmount,
       billTo: formData.buyerFullName,
       billEmail: formData.buyerEmail,
-      billPhone: `${formData.buyerCountryCode}${formData.buyerPhone}`,
+      billPhone: formattedPhone,
       billExternalReferenceNo: externalReference,
-      billReturnUrl: `${baseUrl}/checkout/success?billCode={billcode}&status_id={status_id}&order_id={order_id}`,
-      billCallbackUrl: `${baseUrl}/api/webhooks/toyyibpay`,
-      billContentEmail: `Your ticket(s) for ${event.name}`,
-    });
+      billReturnUrl: `${baseUrl}/checkout/acknowledgement/{billcode}?status_id={status_id}&order_id={order_id}&transaction_id={transaction_id}&booking_ref=${bookingReference}`,
+      billCallbackUrl: `${callbackBaseUrl}/api/webhooks/toyyibpay`,
+      billContentEmail: `Your ticket(s) for ${event.name} - Booking Reference: ${bookingReference}`,
+    };
 
-    // Store the bill code and metadata in session or database for later verification
-    await convex.mutation(api.tickets.createPendingTicket, {
-      eventId,
-      userId,
-      waitingListId: queuePosition._id,
-      billCode: billResponse.billCode,
-      externalReference,
+    // Create ToyyibPay bill using the buyer's information
+    const billResponse = await toyyibpayClient.createBill(billData);
+
+    // Create payment record for this booking
+    await convex.mutation(api.payments.create, {
+      booking_id: bookingId,
       amount: totalAmount,
-      metadata: JSON.stringify(metadata)
+      currency: "MYR",
+      payment_method: "toyyibpay",
+      payment_provider: "ToyyibPay",
+      bill_code: billResponse.billCode,
     });
 
     return { 
       billCode: billResponse.billCode, 
-      paymentUrl: billResponse.billpaymentURL 
+      paymentUrl: billResponse.billpaymentURL,
+      bookingReference 
     };
   } catch (error) {
-    console.error("Error creating ToyyibPay bill:", error);
+    // Re-throw the original error message if it's more specific
+    if (error instanceof Error && error.message !== "Failed to create payment session") {
+      throw error;
+    }
+    
     throw new Error("Failed to create payment session");
   }
 } 

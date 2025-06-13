@@ -10,7 +10,6 @@ import {
   Check,
   CircleArrowRight,
   LoaderCircle,
-  XCircle,
   PencilIcon,
   StarIcon,
 } from "lucide-react";
@@ -23,25 +22,27 @@ import Image from "next/image";
 export default function EventCard({ eventId }: { eventId: Id<"events"> }) {
   const { user } = useUser();
   const router = useRouter();
-  const event = useQuery(api.events.getById, { eventId });
-  const availability = useQuery(api.events.getEventAvailability, { eventId });
+  const event = useQuery(api.events.getById, { event_id: eventId });
+  const availability = useQuery(api.events.getEventAvailability, { event_id: eventId });
   const userTicket = useQuery(api.tickets.getUserTicketForEvent, {
-    eventId,
-    userId: user?.id ?? "",
+    event_id: eventId,
+    user_id: user?.id ?? "",
   });
   const queuePosition = useQuery(api.waitingList.getQueuePosition, {
-    eventId,
-    userId: user?.id ?? "",
+    event_id: eventId,
+    user_id: user?.id ?? "",
   });
-  const imageUrl = useStorageUrl(event?.imageStorageId);
+  const imageUrl = useStorageUrl(event?.image_storage_id);
 
   if (!event || !availability) {
     return null;
   }
 
-  const isPastEvent = event.eventDate < Date.now();
+  const isPastEvent = event.event_date < Date.now();
 
-  const isEventOwner = user?.id === event?.userId;
+  // For now, we'll check if user owns this event by checking vendor relationship
+  // This is a temporary solution until we have proper event ownership in the schema
+  const isEventOwner = false; // TODO: Implement proper event ownership check
 
   const renderQueuePosition = () => {
     if (!queuePosition || queuePosition.status !== "waiting") return null;
@@ -134,14 +135,6 @@ export default function EventCard({ eventId }: { eventId: Id<"events"> }) {
             <PurchaseTicket eventId={eventId} />
           )}
           {renderQueuePosition()}
-          {queuePosition.status === "expired" && (
-            <div className="p-3 bg-red-50 rounded-lg border border-red-100">
-              <span className="text-red-700 font-medium flex items-center">
-                <XCircle className="w-5 h-5 mr-2" />
-                Offer expired
-              </span>
-            </div>
-          )}
         </div>
       );
     }
@@ -221,7 +214,7 @@ export default function EventCard({ eventId }: { eventId: Id<"events"> }) {
           <div className="flex items-center text-gray-600">
             <CalendarDays className="w-4 h-4 mr-2" />
             <span>
-              {new Date(event.eventDate).toLocaleDateString()}{" "}
+              {new Date(event.event_date).toLocaleDateString()}{" "}
               {isPastEvent && "(Ended)"}
             </span>
           </div>
@@ -231,13 +224,6 @@ export default function EventCard({ eventId }: { eventId: Id<"events"> }) {
             <span>
               {availability.totalTickets - availability.purchasedCount} /{" "}
               {availability.totalTickets} available
-              {!isPastEvent && availability.activeOffers > 0 && (
-                <span className="text-amber-600 text-sm ml-2">
-                  ({availability.activeOffers}{" "}
-                  {availability.activeOffers === 1 ? "person" : "people"} trying
-                  to buy)
-                </span>
-              )}
             </span>
           </div>
         </div>

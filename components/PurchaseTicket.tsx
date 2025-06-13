@@ -13,14 +13,16 @@ export default function PurchaseTicket({ eventId }: { eventId: Id<"events"> }) {
   const router = useRouter();
   const { user } = useUser();
   const queuePosition = useQuery(api.waitingList.getQueuePosition, {
-    eventId,
-    userId: user?.id ?? "",
+    event_id: eventId,
+    user_id: user?.id ?? "",
   });
+  
+  const event = useQuery(api.events.getById, { event_id: eventId });
 
   const [timeRemaining, setTimeRemaining] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const offerExpiresAt = queuePosition?.offerExpiresAt ?? 0;
+  const offerExpiresAt = queuePosition?.offer_expires_at ?? 0;
   const isExpired = Date.now() > offerExpiresAt;
 
   useEffect(() => {
@@ -79,7 +81,7 @@ export default function PurchaseTicket({ eventId }: { eventId: Id<"events"> }) {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">
-                  {user ? "Ticket Reserved" : "Purchase Ticket"}
+                  {user ? `${queuePosition.quantity} Ticket${queuePosition.quantity > 1 ? 's' : ''} Reserved` : "Purchase Ticket"}
                 </h3>
                 {user && (
                   <p className="text-sm text-gray-500">
@@ -91,7 +93,7 @@ export default function PurchaseTicket({ eventId }: { eventId: Id<"events"> }) {
 
             <div className="text-sm text-gray-600 leading-relaxed">
               {user 
-                ? "A ticket has been reserved for you. Complete your purchase before the timer expires to secure your spot at this event."
+                ? `${queuePosition.quantity} ticket${queuePosition.quantity > 1 ? 's have' : ' has'} been reserved for you. Complete your purchase before the timer expires to secure your spot${queuePosition.quantity > 1 ? 's' : ''} at this event.`
                 : "Purchase your ticket now to secure your spot at this event."
               }
             </div>
@@ -107,7 +109,7 @@ export default function PurchaseTicket({ eventId }: { eventId: Id<"events"> }) {
           >
             {isLoading
               ? "Proceeding to cart..."
-              : "Purchase Your Ticket Now →"}
+              : `Purchase Your Ticket${queuePosition.quantity > 1 ? 's' : ''} Now (RM ${event ? (event.price * queuePosition.quantity).toFixed(2) : '0.00'}) →`}
           </button>
         ) : null}
 

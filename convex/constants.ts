@@ -1,22 +1,24 @@
 import { Doc } from "./_generated/dataModel";
 
-// Time constants in milliseconds
 export const DURATIONS = {
-  TICKET_OFFER: 30 * 60 * 1000, // 30 minutes
-} as const;
+  OFFER_EXPIRY: 15 * 60 * 1000, // 15 minutes in milliseconds
+  CLEANUP_INTERVAL: 5 * 60 * 1000, // 5 minutes in milliseconds
+};
 
-// Status types for better type safety
-export const WAITING_LIST_STATUS: Record<string, Doc<"waitingList">["status"]> =
+// Updated to use new table name
+export const WAITING_LIST_STATUS: Record<string, Doc<"waiting_list">["status"]> =
   {
     WAITING: "waiting",
-    OFFERED: "offered",
+    OFFERED: "offered", 
     PURCHASED: "purchased",
     EXPIRED: "expired",
-  } as const;
+    CANCELLED: "cancelled",
+  };
 
 export const TICKET_STATUS: Record<string, Doc<"tickets">["status"]> = {
+  ISSUED: "issued",
   VALID: "valid",
   USED: "used",
   REFUNDED: "refunded",
   CANCELLED: "cancelled",
-} as const;
+}; 

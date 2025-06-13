@@ -1,73 +1,94 @@
-import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { v } from "convex/values";
 
-export const updateUser = mutation({
+export const store = mutation({
   args: {
-    userId: v.string(),
+    user_id: v.string(),
     name: v.string(),
     email: v.string(),
     phone: v.optional(v.string()),
   },
-  handler: async (ctx, { userId, name, email, phone }) => {
-    // Check if user exists
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+
     const existingUser = await ctx.db
       .query("users")
-      .withIndex("by_user_id", (q) => q.eq("userId", userId))
-      .first();
+      .withIndex("by_user_id", (q) => q.eq("user_id", args.user_id))
+      .unique();
 
     if (existingUser) {
-      // Update existing user
-      const updateData: any = { name, email };
-      if (phone !== undefined) {
-        updateData.phone = phone;
-      }
-      
-      await ctx.db.patch(existingUser._id, updateData);
+      await ctx.db.patch(existingUser._id, {
+        name: args.name,
+        email: args.email,
+        phone: args.phone,
+        updated_at: Date.now(),
+      });
       return existingUser._id;
+    } else {
+      return await ctx.db.insert("users", {
+        user_id: args.user_id,
+        name: args.name,
+        email: args.email,
+        phone: args.phone,
+        created_at: Date.now(),
+      });
     }
-
-    // Create new user
-    const newUserData: any = { userId, name, email };
-    if (phone !== undefined) {
-      newUserData.phone = phone;
-    }
-
-    const newUserId = await ctx.db.insert("users", newUserData);
-    return newUserId;
   },
 });
 
-export const updateUserPhone = mutation({
+export const updatePhone = mutation({
   args: {
-    userId: v.string(),
+    user_id: v.string(),
     phone: v.string(),
   },
-  handler: async (ctx, { userId, phone }) => {
-    const existingUser = await ctx.db
+  handler: async (ctx, args) => {
+    const user = await ctx.db
       .query("users")
-      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .withIndex("by_user_id", (q) => q.eq("user_id", args.user_id))
+      .unique();
+
+    if (!user) throw new Error("User not found");
+
+    await ctx.db.patch(user._id, {
+      phone: args.phone,
+      updated_at: Date.now(),
+    });
+  },
+});
+
+export const get = query({
+  args: { user_id: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("users")
+      .withIndex("by_user_id", (q) => q.eq("user_id", args.user_id))
+      .unique();
+  },
+});
+
+export const updateUser = mutation({
+  args: {
+    user_id: v.string(),
+    updates: v.object({
+      name: v.optional(v.string()),
+      email: v.optional(v.string()),
+      phone: v.optional(v.string()),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_user_id", (q) => q.eq("user_id", args.user_id))
       .first();
 
-    if (!existingUser) {
+    if (!user) {
       throw new Error("User not found");
     }
 
-    await ctx.db.patch(existingUser._id, {
-      phone,
+    await ctx.db.patch(user._id, {
+      ...args.updates,
+      updated_at: Date.now(),
     });
-
-    return existingUser._id;
-  },
-});
-
-export const getUserById = query({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_user_id", (q) => q.eq("userId", userId))
-      .first();
-
-    return user;
   },
 });
