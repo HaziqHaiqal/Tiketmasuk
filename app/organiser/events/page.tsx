@@ -14,7 +14,7 @@ export default function OrganiserEventsPage() {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push("/auth-test");
+      router.push("/auth/login");
     }
   }, [isAuthenticated, isLoading, router]);
 

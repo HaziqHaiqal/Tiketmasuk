@@ -24,22 +24,118 @@ export default defineSchema({
   })
     .index("by_user_id", ["user_id"]),
 
-  // Organizer profiles - separate table for organizer-specific data (like public.management_profiles)
+  // Organizer profiles - flexible structure for all types of organizers
   organizer_profiles: defineTable({
     user_id: v.string(), // User ID from Convex Auth
-    contact_name: v.string(),
-    business_name: v.string(),
-    business_registration: v.optional(v.string()),
-    phone: v.optional(v.string()),
+    
+    // REQUIRED FIELDS - Essential for all organizers
+    display_name: v.string(), // Public name shown to customers (e.g., "John's Events", "Music Lovers Club")
+    full_name: v.string(), // Organizer's real full name
+    phone: v.optional(v.string()), // Contact phone number - optional initially
+    
+    // STORE/BRAND INFORMATION
+    store_name: v.string(), // Their store/brand name for selling products
+    store_description: v.optional(v.string()), // What they do, their story
+    
+    // PROFILE & BRANDING IMAGES
+    profile_image_storage_id: v.optional(v.id("_storage")), // Main profile picture/avatar (circular)
+    store_logo_storage_id: v.optional(v.id("_storage")), // Store logo (for events & products)
+    store_banner_storage_id: v.optional(v.id("_storage")), // Store banner/cover image
+    
+    // IMAGE METADATA (for better management)
+    images: v.optional(v.object({
+      profile_image: v.optional(v.object({
+        storage_id: v.id("_storage"),
+        filename: v.string(),
+        size: v.number(), // in bytes
+        uploaded_at: v.number(),
+      })),
+      store_logo: v.optional(v.object({
+        storage_id: v.id("_storage"),
+        filename: v.string(),
+        size: v.number(),
+        uploaded_at: v.number(),
+      })),
+      store_banner: v.optional(v.object({
+        storage_id: v.id("_storage"),
+        filename: v.string(),
+        size: v.number(),
+        uploaded_at: v.number(),
+      })),
+    })),
+    
+    // ORGANIZER TYPE & CATEGORY
+    organizer_type: v.union(
+      v.literal("individual"), // Solo organizer
+      v.literal("group"), // Informal group/club
+      v.literal("organization"), // NGO, association
+      v.literal("business") // Registered business
+    ),
+    event_categories: v.optional(v.array(v.string())), // Types of events they organize
+    
+    // OPTIONAL BUSINESS DETAILS (only for those who have them)
+    business_registration: v.optional(v.string()), // Only if they have one
+    business_name: v.optional(v.string()), // Official business name if different from display_name
+    tax_id: v.optional(v.string()), // For tax purposes if applicable
+    
+    // LOCATION & REACH
+    primary_location: v.string(), // City/State where they primarily operate
+    service_areas: v.optional(v.array(v.string())), // Areas they serve
+    
+    // SOCIAL & WEB PRESENCE
     website: v.optional(v.string()),
-    description: v.optional(v.string()),
-    logo_storage_id: v.optional(v.id("_storage")),
-    status: v.union(v.literal("pending"), v.literal("active"), v.literal("suspended")),
+    social_media: v.optional(v.object({
+      facebook: v.optional(v.string()),
+      instagram: v.optional(v.string()),
+      twitter: v.optional(v.string()),
+      tiktok: v.optional(v.string()),
+      youtube: v.optional(v.string()),
+    })),
+    
+    // VERIFICATION & STATUS
+    verification_status: v.union(
+      v.literal("unverified"), // Just registered
+      v.literal("pending"), // Submitted for verification
+      v.literal("verified"), // Verified organizer
+      v.literal("premium") // Premium verified organizer
+    ),
+    verification_documents: v.optional(v.array(v.id("_storage"))), // ID, business docs, etc.
+    
+    // ACCOUNT STATUS
+    status: v.union(
+      v.literal("pending"),
+      v.literal("active"),
+      v.literal("suspended"),
+      v.literal("banned")
+    ),
+    
+    // SETTINGS & PREFERENCES
+    settings: v.optional(v.object({
+      auto_approve_events: v.optional(v.boolean()), // Auto-publish events or require review
+      allow_reviews: v.optional(v.boolean()), // Allow customer reviews
+      public_contact_info: v.optional(v.boolean()), // Show contact info publicly
+      newsletter_enabled: v.optional(v.boolean()), // Send marketing emails
+    })),
+    
+    // STATISTICS (for dashboard)
+    stats: v.optional(v.object({
+      total_events: v.optional(v.number()),
+      total_tickets_sold: v.optional(v.number()),
+      total_revenue: v.optional(v.number()), // in cents
+      average_rating: v.optional(v.number()),
+      total_reviews: v.optional(v.number()),
+    })),
+    
+    // TIMESTAMPS
     created_at: v.number(),
     updated_at: v.optional(v.number()),
+    last_active_at: v.optional(v.number()),
   })
     .index("by_user_id", ["user_id"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_verification_status", ["verification_status"])
+    .index("by_organizer_type", ["organizer_type"])
+    .index("by_primary_location", ["primary_location"]),
 
   // Events table with embedded categories and pricing tiers
   events: defineTable({

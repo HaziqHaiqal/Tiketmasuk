@@ -11,7 +11,7 @@ export default function CreateEventPage() {
   const router = useRouter();
 
   if (!isAuthenticated) {
-    router.push("/auth-test");
+    router.push("/auth/login");
     return null;
   }
 

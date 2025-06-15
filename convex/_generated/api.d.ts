@@ -15,6 +15,7 @@ import type * as crons from "../crons.js";
 import type * as eventHelpers from "../eventHelpers.js";
 import type * as events from "../events.js";
 import type * as http from "../http.js";
+import type * as organizers from "../organizers.js";
 import type * as payments from "../payments.js";
 import type * as products from "../products.js";
 import type * as promoCodes from "../promoCodes.js";
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   eventHelpers: typeof eventHelpers;
   events: typeof events;
   http: typeof http;
+  organizers: typeof organizers;
   payments: typeof payments;
   products: typeof products;
   promoCodes: typeof promoCodes;

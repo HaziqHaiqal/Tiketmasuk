@@ -267,7 +267,7 @@ function DetailsContent() {
 
   // Redirect to auth if not authenticated
   if (!isAuthenticated) {
-    window.location.href = '/auth-test';
+    window.location.href = '/auth/login';
     return <Spinner />;
   }
 

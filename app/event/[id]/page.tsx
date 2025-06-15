@@ -282,7 +282,7 @@ export default function EventPage() {
                       userId="" // Will be handled by the backend using ctx.auth
                     />
                   ) : (
-                    <Link href="/auth-test">
+                    <Link href="/auth/login">
                       <Button className="w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg">
                         Sign in to buy tickets
                       </Button>

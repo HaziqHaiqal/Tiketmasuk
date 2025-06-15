@@ -14,7 +14,7 @@ export function Logo() {
     <Link href="/" className="font-bold shrink-0" aria-label="Home">
       <Image
         src={logo}
-        alt="TiketMasuk Logo"
+        alt="Tiketmasuk Logo"
         width={LOGO_CONFIG.width}
         height={LOGO_CONFIG.height}
         className="w-56 lg:w-50 object-contain"

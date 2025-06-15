@@ -312,21 +312,39 @@ export const unpublishEvent = mutation({
   },
 });
 
-// Create organizer profile (simplified - no pending status)
+// Create organizer profile (simplified - starts as pending for admin review)
 export const createOrganizerProfile = mutation({
   args: {
     user_id: v.string(),
-    contact_name: v.string(),
-    business_name: v.string(),
+    display_name: v.string(),
+    full_name: v.string(),
+    store_name: v.string(),
     business_registration: v.optional(v.string()),
     phone: v.optional(v.string()),
     website: v.optional(v.string()),
-    description: v.optional(v.string()),
+    store_description: v.optional(v.string()),
+    organizer_type: v.union(
+      v.literal("individual"),
+      v.literal("group"),
+      v.literal("organization"),
+      v.literal("business")
+    ),
+    primary_location: v.string(),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("organizer_profiles", {
-      ...args,
-      status: "pending",
+      user_id: args.user_id,
+      display_name: args.display_name,
+      full_name: args.full_name,
+      store_name: args.store_name,
+      business_registration: args.business_registration,
+      phone: args.phone,
+      website: args.website,
+      store_description: args.store_description,
+      organizer_type: args.organizer_type,
+      primary_location: args.primary_location,
+      verification_status: "unverified",
+      status: "pending", // New organizers start as pending for admin approval
       created_at: Date.now(),
     });
   },
@@ -695,14 +713,7 @@ export const createEventFromOrganizerInput = mutation({
       .first();
 
     if (!organizerProfile) {
-      const organizerProfileId = await ctx.db.insert("organizer_profiles", {
-        user_id: identity.subject,
-        contact_name: identity.name!,
-        business_name: identity.name || "My Business",
-        status: "pending", // New organizers start as pending for admin approval
-        created_at: Date.now(),
-      });
-      organizerProfile = await ctx.db.get(organizerProfileId);
+      throw new Error("Organizer profile not found. Please create an organizer profile first.");
     }
 
     if (!organizerProfile) {

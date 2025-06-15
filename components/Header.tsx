@@ -24,7 +24,7 @@ function Header() {
           <Link href="/" className="font-bold shrink-0" aria-label="Home">
             <Image
               src={logo}
-              alt="TiketMasuk Logo"
+              alt="Tiketmasuk Logo"
               width={LOGO_CONFIG.width}
               height={LOGO_CONFIG.height}
               className="w-56 lg:w-50 object-contain"
@@ -44,7 +44,7 @@ function Header() {
               </button>
             </Authenticated>
             <Unauthenticated>
-              <Link href="/auth-test">
+              <Link href="/auth/login">
                 <button className="bg-gray-100 text-gray-800 px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 transition border border-gray-300">
                   Sign In
                 </button>
@@ -83,7 +83,7 @@ function Header() {
           </Authenticated>
 
           <Unauthenticated>
-            <Link href="/auth-test">
+            <Link href="/auth/login">
               <button className="bg-gray-100 text-gray-800 px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 transition border border-gray-300">
                 Sign In
               </button>

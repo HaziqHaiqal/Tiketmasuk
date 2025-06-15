@@ -30,12 +30,20 @@ export const getCurrentUser = query({
 
 export const createOrganizerProfile = mutation({
   args: {
-    contact_name: v.string(),
-    business_name: v.string(),
+    display_name: v.string(),
+    full_name: v.string(),
+    store_name: v.string(),
     business_registration: v.optional(v.string()),
     phone: v.optional(v.string()),
     website: v.optional(v.string()),
-    description: v.optional(v.string()),
+    store_description: v.optional(v.string()),
+    organizer_type: v.union(
+      v.literal("individual"),
+      v.literal("group"),
+      v.literal("organization"),
+      v.literal("business")
+    ),
+    primary_location: v.string(),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -55,12 +63,16 @@ export const createOrganizerProfile = mutation({
 
     return await ctx.db.insert("organizer_profiles", {
       user_id: identity.subject,
-      contact_name: args.contact_name,
-      business_name: args.business_name,
+      display_name: args.display_name,
+      full_name: args.full_name,
+      store_name: args.store_name,
       business_registration: args.business_registration,
       phone: args.phone,
       website: args.website,
-      description: args.description,
+      store_description: args.store_description,
+      organizer_type: args.organizer_type,
+      primary_location: args.primary_location,
+      verification_status: "unverified",
       status: "pending", // New organizers start as pending for admin approval
       created_at: Date.now(),
     });
@@ -84,12 +96,20 @@ export const getOrganizerProfile = query({
 
 export const updateOrganizerProfile = mutation({
   args: {
-    contact_name: v.optional(v.string()),
-    business_name: v.optional(v.string()),
+    display_name: v.optional(v.string()),
+    full_name: v.optional(v.string()),
+    store_name: v.optional(v.string()),
     business_registration: v.optional(v.string()),
     phone: v.optional(v.string()),
     website: v.optional(v.string()),
-    description: v.optional(v.string()),
+    store_description: v.optional(v.string()),
+    organizer_type: v.optional(v.union(
+      v.literal("individual"),
+      v.literal("group"),
+      v.literal("organization"),
+      v.literal("business")
+    )),
+    primary_location: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -110,12 +130,15 @@ export const updateOrganizerProfile = mutation({
       updated_at: Date.now(),
     };
 
-    if (args.contact_name !== undefined) updates.contact_name = args.contact_name;
-    if (args.business_name !== undefined) updates.business_name = args.business_name;
+    if (args.display_name !== undefined) updates.display_name = args.display_name;
+    if (args.full_name !== undefined) updates.full_name = args.full_name;
+    if (args.store_name !== undefined) updates.store_name = args.store_name;
     if (args.business_registration !== undefined) updates.business_registration = args.business_registration;
     if (args.phone !== undefined) updates.phone = args.phone;
     if (args.website !== undefined) updates.website = args.website;
-    if (args.description !== undefined) updates.description = args.description;
+    if (args.store_description !== undefined) updates.store_description = args.store_description;
+    if (args.organizer_type !== undefined) updates.organizer_type = args.organizer_type;
+    if (args.primary_location !== undefined) updates.primary_location = args.primary_location;
 
     await ctx.db.patch(profile._id, updates);
     return await ctx.db.get(profile._id);
