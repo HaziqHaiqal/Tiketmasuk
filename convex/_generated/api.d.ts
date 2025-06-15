@@ -8,16 +8,19 @@
  * @module
  */
 
+import type * as auth from "../auth.js";
 import type * as bookings from "../bookings.js";
 import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
+import type * as eventHelpers from "../eventHelpers.js";
 import type * as events from "../events.js";
+import type * as http from "../http.js";
 import type * as payments from "../payments.js";
 import type * as products from "../products.js";
+import type * as promoCodes from "../promoCodes.js";
 import type * as storage from "../storage.js";
 import type * as tickets from "../tickets.js";
 import type * as users from "../users.js";
-import type * as vendors from "../vendors.js";
 import type * as waitingList from "../waitingList.js";
 
 import type {
@@ -35,16 +38,19 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  auth: typeof auth;
   bookings: typeof bookings;
   constants: typeof constants;
   crons: typeof crons;
+  eventHelpers: typeof eventHelpers;
   events: typeof events;
+  http: typeof http;
   payments: typeof payments;
   products: typeof products;
+  promoCodes: typeof promoCodes;
   storage: typeof storage;
   tickets: typeof tickets;
   users: typeof users;
-  vendors: typeof vendors;
   waitingList: typeof waitingList;
 }>;
 declare const fullApiWithMounts: typeof fullApi;

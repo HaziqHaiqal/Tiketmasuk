@@ -56,7 +56,7 @@ export class ToyyibPayClient {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams(bill as any).toString(),
+        body: new URLSearchParams(bill as unknown as Record<string, string>).toString(),
       });
 
       if (!response.ok) {
@@ -82,7 +82,7 @@ export class ToyyibPayClient {
         if (result && result.status === 'error') {
           throw new Error(`ToyyibPay API error: ${result.msg}`);
         }
-      } catch (parseError) {
+      } catch {
         // If not JSON, check if it's a direct bill code
         if (responseText && responseText.length > 0 && !responseText.includes('<') && !responseText.includes('error')) {
           result = [{ BillCode: responseText.trim() }];
@@ -103,7 +103,8 @@ export class ToyyibPayClient {
         throw new Error('Failed to create bill: No bill code returned');
       }
     } catch (error) {
-      throw error;
+      console.error("ToyyibPay API Error:", error);
+      throw new Error(`ToyyibPay API Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

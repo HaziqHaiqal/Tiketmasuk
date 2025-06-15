@@ -2,23 +2,19 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useQuery } from "convex/react";
 import { Id } from "@/convex/_generated/dataModel";
 import { 
   Calendar, 
   MapPin, 
-  Ticket, 
   Clock, 
   ArrowRight, 
   ArrowLeft,
   User,
   FileText,
-  Phone,
-  Mail,
   CreditCard,
-  MapPin as AddressIcon,
   CheckCircle,
   CalendarIcon
 } from "lucide-react";
@@ -38,6 +34,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { getMinPrice } from "@/lib/eventUtils";
 
 interface TicketHolderData {
   fullName: string;
@@ -77,17 +74,10 @@ const MALAYSIAN_STATES = [
 ];
 const GENDERS = ['Male', 'Female'];
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-];
-
-const YEARS = Array.from({ length: 100 }, (_, i) => new Date().getFullYear() - i);
-
 function DetailsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, isLoaded } = useUser();
+  const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   
   const eventId = searchParams.get("eventId") as Id<"events">;
   const waitingListId = searchParams.get("waitingListId") as Id<"waiting_list">;
@@ -108,10 +98,13 @@ function DetailsContent() {
   });
 
   const event = useQuery(api.events.getById, { event_id: eventId });
-  const queuePosition = useQuery(api.waitingList.getQueuePosition, {
-    event_id: eventId,
-    user_id: user?.id ?? "",
-  });
+  const queuePosition = useQuery(
+    api.waitingList.getQueuePosition,
+    isAuthenticated ? {
+      event_id: eventId,
+      user_id: "", // Will be handled by the backend using ctx.auth
+    } : "skip"
+  );
   
   const imageUrl = useStorageUrl(event?.image_storage_id);
 
@@ -166,7 +159,7 @@ function DetailsContent() {
       try {
         const data = JSON.parse(storedData) as PurchaseFormData;
         setFormData(data);
-      } catch (error) {
+      } catch {
         // Silently handle parsing errors
       }
     }
@@ -197,31 +190,8 @@ function DetailsContent() {
     }
   }, [queuePosition?.quantity, formData.ticketHolders.length]);
 
-  // Auto-populate buyer info if not already filled
-  useEffect(() => {
-    if (user && formData.buyerFullName === "") {
-      // Extract phone number without country code if it's Malaysian (+60)
-      const primaryPhone = user.primaryPhoneNumber?.phoneNumber || "";
-      let phoneNumber = "";
-      
-      if (primaryPhone) {
-        // If phone starts with +60, remove it to get local format (we'll show +60 as fixed prefix)
-        if (primaryPhone.startsWith("+60")) {
-          phoneNumber = primaryPhone.substring(3);
-        } else {
-          // For other country codes, keep the full number but remove the +
-          phoneNumber = primaryPhone.startsWith("+") ? primaryPhone.substring(1) : primaryPhone;
-        }
-      }
-
-      setFormData(prev => ({
-        ...prev,
-        buyerFullName: `${user.firstName || ""} ${user.lastName || ""}`.trim(),
-        buyerEmail: user.emailAddresses[0]?.emailAddress || "",
-        buyerPhone: phoneNumber,
-      }));
-    }
-  }, [user?.id, user?.firstName, user?.lastName, user?.emailAddresses, user?.primaryPhoneNumber]); // Only depend on user properties, not formData
+  // Note: Auto-population removed since Convex Auth doesn't provide detailed user profile
+  // Users will need to manually enter their information
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -290,16 +260,16 @@ function DetailsContent() {
     }));
   };
 
-  // Wait for Clerk to load
-  if (!isLoaded) {
+  // Wait for auth to load
+  if (authLoading) {
     return <Spinner />;
   }
 
-  // Redirect to Clerk sign-in if not authenticated
-  if (!user) {
-    window.location.href = '/sign-in';
+  // Redirect to auth if not authenticated
+  if (!isAuthenticated) {
+    window.location.href = '/auth-test';
     return <Spinner />;
-    }
+  }
 
   if (!event) {
     return <Spinner />;
@@ -696,7 +666,7 @@ function DetailsContent() {
                                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
                       <span>Ticket × {queuePosition.quantity}</span>
-                      <span>RM {(event.price * queuePosition.quantity).toFixed(2)}</span>
+                      <span>RM {((getMinPrice(event) / 100) * queuePosition.quantity).toFixed(2)}</span>
                     </div>
                   <div className="flex justify-between text-sm">
                     <span>Service Fee</span>
@@ -705,7 +675,7 @@ function DetailsContent() {
                   <Separator />
                   <div className="flex justify-between font-semibold">
                     <span>Total</span>
-                    <span>RM {(event.price * queuePosition.quantity).toFixed(2)}</span>
+                    <span>RM {((getMinPrice(event) / 100) * queuePosition.quantity).toFixed(2)}</span>
                   </div>
                 </div>
 

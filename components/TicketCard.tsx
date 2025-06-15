@@ -12,9 +12,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Spinner from "./Spinner";
+import { getMinPrice } from "@/lib/eventUtils";
 
 export default function TicketCard({ ticketId }: { ticketId: Id<"tickets"> }) {
-  const ticket = useQuery(api.tickets.getTicketWithDetails, { ticket_id: ticketId });
+  const ticket = useQuery(api.tickets.getTicketDetails, { ticket_id: ticketId });
 
   if (!ticket || !ticket.event) return <Spinner />;
 
@@ -56,7 +57,7 @@ export default function TicketCard({ ticketId }: { ticketId: Id<"tickets"> }) {
               {ticket.event.name}
             </h3>
             <p className="text-sm text-gray-500 mt-1">
-              Purchased on {new Date(ticket.issued_at).toLocaleDateString()}
+              Purchased on {new Date(ticket.ticketDetails.issued_at).toLocaleDateString()}
             </p>
             {ticket.event.is_cancelled && (
               <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
@@ -70,12 +71,12 @@ export default function TicketCard({ ticketId }: { ticketId: Id<"tickets"> }) {
               className={`px-3 py-1 rounded-full text-sm font-medium ${
                 ticket.event.is_cancelled
                   ? "bg-red-50 text-red-700 border-red-100"
-                  : statusColors[ticket.status]
+                  : statusColors[ticket.ticketDetails.status]
               }`}
             >
               {ticket.event.is_cancelled
                 ? "Cancelled"
-                : statusText[ticket.status]}
+                : statusText[ticket.ticketDetails.status]}
             </span>
             {isPastEvent && !ticket.event.is_cancelled && (
               <span className="flex items-center gap-1 text-xs text-gray-500">
@@ -113,7 +114,7 @@ export default function TicketCard({ ticketId }: { ticketId: Id<"tickets"> }) {
                   : "text-blue-600"
             }`}
           >
-            RM {ticket.event.price.toFixed(2)}
+            RM {(getMinPrice(ticket.event) / 100).toFixed(2)}
           </span>
           <span className="text-gray-600 flex items-center">
             View Ticket <ArrowRight className="w-4 h-4 ml-1" />

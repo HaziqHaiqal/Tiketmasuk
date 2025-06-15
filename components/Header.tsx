@@ -1,4 +1,7 @@
-import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+"use client";
+
+import { Authenticated, Unauthenticated } from "convex/react";
+import { useAuthActions } from "@convex-dev/auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import logo from "@/images/tiketmasuk-logo-dark.png";
@@ -12,6 +15,8 @@ const LOGO_CONFIG = {
 } as const;
 
 function Header() {
+  const { signOut } = useAuthActions();
+
   return (
     <header className="border-b">
       <div className="flex flex-col lg:flex-row items-center gap-4 p-4">
@@ -30,16 +35,21 @@ function Header() {
           </Link>
 
           <div className="lg:hidden">
-            <SignedIn>
-              <UserButton />
-            </SignedIn>
-            <SignedOut>
-              <SignInButton mode="modal">
+            <Authenticated>
+              <button
+                onClick={() => signOut()}
+                className="bg-red-100 text-red-800 px-3 py-1.5 text-sm rounded-lg hover:bg-red-200 transition border border-red-300"
+              >
+                Sign Out
+              </button>
+            </Authenticated>
+            <Unauthenticated>
+              <Link href="/auth-test">
                 <button className="bg-gray-100 text-gray-800 px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 transition border border-gray-300">
                   Sign In
                 </button>
-              </SignInButton>
-            </SignedOut>
+              </Link>
+            </Unauthenticated>
           </div>
         </div>
 
@@ -49,7 +59,7 @@ function Header() {
         </div>
 
         <div className="hidden lg:block ml-auto">
-          <SignedIn>
+          <Authenticated>
             <div className="flex items-center gap-3">
               <Link href="/organiser">
                 <button className="bg-blue-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-blue-700 transition">
@@ -62,22 +72,28 @@ function Header() {
                   My Tickets
                 </button>
               </Link>
-              <UserButton />
+              
+              <button
+                onClick={() => signOut()}
+                className="bg-red-100 text-red-800 px-3 py-1.5 text-sm rounded-lg hover:bg-red-200 transition border border-red-300"
+              >
+                Sign Out
+              </button>
             </div>
-          </SignedIn>
+          </Authenticated>
 
-          <SignedOut>
-            <SignInButton mode="modal">
+          <Unauthenticated>
+            <Link href="/auth-test">
               <button className="bg-gray-100 text-gray-800 px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 transition border border-gray-300">
                 Sign In
               </button>
-            </SignInButton>
-          </SignedOut>
+            </Link>
+          </Unauthenticated>
         </div>
 
         {/* Mobile Action Buttons */}
         <div className="lg:hidden w-full flex justify-center gap-3">
-          <SignedIn>
+          <Authenticated>
             <Link href="/organiser" className="flex-1">
               <button className="w-full bg-blue-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-blue-700 transition">
                 Sell Tickets
@@ -89,7 +105,7 @@ function Header() {
                 My Tickets
               </button>
             </Link>
-          </SignedIn>
+          </Authenticated>
         </div>
       </div>
     </header>

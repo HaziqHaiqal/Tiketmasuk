@@ -1,21 +1,26 @@
 "use client";
 
-import { Id } from "@/convex/_generated/dataModel";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
-import { api } from "@/convex/_generated/api";
+import { useState, useEffect } from "react";
+
+import { useConvexAuth } from "convex/react";
 import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
+import { Ticket } from "lucide-react";
+import { useRouter } from "next/navigation";
 import ReleaseTicket from "./ReleaseTicket";
-import { Ticket, User, UserCheck } from "lucide-react";
+import { getMinPrice } from "@/lib/eventUtils";
 
 export default function PurchaseTicket({ eventId }: { eventId: Id<"events"> }) {
   const router = useRouter();
-  const { user } = useUser();
-  const queuePosition = useQuery(api.waitingList.getQueuePosition, {
-    event_id: eventId,
-    user_id: user?.id ?? "",
-  });
+  const { isAuthenticated } = useConvexAuth();
+  const queuePosition = useQuery(
+    api.waitingList.getQueuePosition,
+    isAuthenticated ? {
+      event_id: eventId,
+      user_id: "", // Will be handled by the backend using ctx.auth
+    } : "skip"
+  );
   
   const event = useQuery(api.events.getById, { event_id: eventId });
 
@@ -53,7 +58,7 @@ export default function PurchaseTicket({ eventId }: { eventId: Id<"events"> }) {
   }, [offerExpiresAt, isExpired]);
 
   const handlePurchaseAsUser = async () => {
-    if (!user || !queuePosition) return;
+    if (!isAuthenticated || !queuePosition) return;
 
     try {
       setIsLoading(true);
@@ -66,7 +71,7 @@ export default function PurchaseTicket({ eventId }: { eventId: Id<"events"> }) {
     }
   };
 
-  if (!user || !queuePosition || queuePosition.status !== "offered") {
+  if (!isAuthenticated || !queuePosition || queuePosition.status !== "offered") {
     return null;
   }
 
@@ -81,9 +86,9 @@ export default function PurchaseTicket({ eventId }: { eventId: Id<"events"> }) {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">
-                  {user ? `${queuePosition.quantity} Ticket${queuePosition.quantity > 1 ? 's' : ''} Reserved` : "Purchase Ticket"}
+                  {isAuthenticated ? `${queuePosition.quantity} Ticket${queuePosition.quantity > 1 ? 's' : ''} Reserved` : "Purchase Ticket"}
                 </h3>
-                {user && (
+                {isAuthenticated && (
                   <p className="text-sm text-gray-500">
                     Expires in {timeRemaining}
                   </p>
@@ -92,7 +97,7 @@ export default function PurchaseTicket({ eventId }: { eventId: Id<"events"> }) {
             </div>
 
             <div className="text-sm text-gray-600 leading-relaxed">
-              {user 
+              {isAuthenticated 
                 ? `${queuePosition.quantity} ticket${queuePosition.quantity > 1 ? 's have' : ' has'} been reserved for you. Complete your purchase before the timer expires to secure your spot${queuePosition.quantity > 1 ? 's' : ''} at this event.`
                 : "Purchase your ticket now to secure your spot at this event."
               }
@@ -100,7 +105,7 @@ export default function PurchaseTicket({ eventId }: { eventId: Id<"events"> }) {
           </div>
         </div>
 
-        {user ? (
+        {isAuthenticated ? (
           // Authenticated user flow
           <button
             onClick={handlePurchaseAsUser}
@@ -109,11 +114,11 @@ export default function PurchaseTicket({ eventId }: { eventId: Id<"events"> }) {
           >
             {isLoading
               ? "Proceeding to cart..."
-              : `Purchase Your Ticket${queuePosition.quantity > 1 ? 's' : ''} Now (RM ${event ? (event.price * queuePosition.quantity).toFixed(2) : '0.00'}) →`}
+              : `Purchase Your Ticket${queuePosition.quantity > 1 ? 's' : ''} Now (RM ${event ? ((getMinPrice(event) / 100) * queuePosition.quantity).toFixed(2) : '0.00'}) →`}
           </button>
         ) : null}
 
-        {user && queuePosition && (
+        {isAuthenticated && queuePosition && (
           <div className="mt-4">
             <ReleaseTicket eventId={eventId} waitingListId={queuePosition._id} />
           </div>

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, Suspense } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+// import { useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useQuery, useMutation } from "convex/react";
 import { 
@@ -10,25 +10,21 @@ import {
   XCircle,
   Calendar, 
   MapPin, 
-  Ticket, 
+  Ticket,
   Clock, 
-  ArrowRight,
-  Download,
   Mail,
   Home,
-  AlertTriangle,
   RefreshCw
 } from "lucide-react";
 import { clearCheckoutSessionData } from "@/lib/utils";
 import Spinner from "@/components/Spinner";
 import TicketComponent from "@/components/Ticket";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getMinPrice } from "@/lib/eventUtils";
 
 function AcknowledgementContent() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
-  const { user } = useUser();
   
   // Handle both URL formats:
   // 1. /acknowledgement/[billcode] - direct access
@@ -53,10 +49,10 @@ function AcknowledgementContent() {
     clearCheckoutSessionData();
   }, []);
 
-  // Get payment with booking and event by bill code
+  // Get payment with booking and event by transaction reference (billCode)
   const bookingWithEvent = useQuery(
-    api.payments.getPaymentWithBookingAndEventByBillCode,
-    billCode ? { bill_code: billCode } : "skip"
+    api.payments.getPaymentWithBookingByTransactionReference,
+    billCode ? { transaction_reference: billCode } : "skip"
   );
 
   // Mutation to update payment status
@@ -113,17 +109,17 @@ function AcknowledgementContent() {
       const newStatus = statusId === "1" ? "completed" : "failed";
       
       updatePaymentStatus({
-        bill_code: billCode,
+        payment_id: bookingWithEvent.payment._id,
         status: newStatus,
         transaction_reference: statusId === "1" ? (transactionId || orderId || billCode) : undefined,
-        provider_response: {
+        payment_response: JSON.stringify({
           billcode: billCode,
           order_id: orderId,
           status_id: statusId,
           transaction_id: transactionId,
           booking_ref: bookingRef,
-        }
-      }).catch((error: any) => {
+        })
+      }).catch((error: unknown) => {
         console.error("Failed to update payment status:", error);
       });
     }
@@ -143,7 +139,7 @@ function AcknowledgementContent() {
             Order Not Found
           </h1>
           <p className="text-gray-600 mb-6">
-            We couldn't find an order with this reference. Please check your email or contact support.
+            We couldn&apos;t find an order with this reference. Please check your email or contact support.
           </p>
           {billCode && (
             <div className="bg-gray-100 rounded-lg p-4 mb-6 text-sm">
@@ -174,7 +170,7 @@ function AcknowledgementContent() {
               Ticket Purchase Successful!
             </h1>
             <p className="mt-2 text-gray-600">
-              Your ticket has been confirmed and is ready to use
+              We&apos;ve sent your ticket details to your email. You can also download your tickets below.
             </p>
           </div>
 
@@ -201,12 +197,12 @@ function AcknowledgementContent() {
           {/* Next Steps */}
           <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
             <h3 className="text-lg font-semibold text-blue-900 mb-3">
-              What's Next?
+              What&apos;s Next?
             </h3>
             <div className="space-y-2 text-sm text-blue-800">
               <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4" />
-                <span>A confirmation email has been sent to {user?.emailAddresses[0]?.emailAddress}</span>
+                <span>A confirmation email has been sent to your registered email address</span>
               </div>
               <div className="flex items-center gap-2">
                 <Ticket className="w-4 h-4" />
@@ -292,8 +288,8 @@ function AcknowledgementContent() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">Event Details</h3>
                       <div className="space-y-4">
                         <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                          <span className="text-gray-600">Ticket × {bookingWithEvent.tickets?.length || 1}</span>
-                          <span className="font-semibold text-gray-900">RM {(bookingWithEvent.event.price * (bookingWithEvent.tickets?.length || 1)).toFixed(2)}</span>
+                          <span className="text-gray-600">Ticket × {tickets?.length || 1}</span>
+                          <span className="font-semibold text-gray-900">RM {((getMinPrice(bookingWithEvent.event) / 100) * (tickets?.length || 1)).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between items-center py-2 border-b border-gray-200">
                           <span className="text-gray-600">Status</span>
@@ -310,11 +306,16 @@ function AcknowledgementContent() {
                     </div>
 
                     {/* Ticket Holder Details */}
-                    {bookingWithEvent.tickets && bookingWithEvent.tickets.length > 0 && (
+                    {tickets && tickets.length > 0 && (
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Ticket Holder Details</h3>
                         <div className="space-y-4">
-                          {bookingWithEvent.tickets.map((ticket, index) => (
+                          {tickets.map((ticket: {
+                            _id: string;
+                            holder_name: string;
+                            holder_email: string;
+                            holder_phone?: string;
+                          }, index: number) => (
                             <div key={ticket._id} className="bg-gray-50 rounded-lg p-4">
                               <h4 className="font-medium text-gray-900 mb-2">Ticket #{index + 1}</h4>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -360,7 +361,7 @@ function AcknowledgementContent() {
                       
                       <div className="pt-3 border-t border-gray-200">
                         <div className="text-xs text-gray-600 uppercase tracking-wide mb-1">Total Amount</div>
-                        <div className="text-xl font-bold text-gray-900">RM {(bookingWithEvent.event.price * (bookingWithEvent.tickets?.length || 1)).toFixed(2)}</div>
+                        <div className="text-xl font-bold text-gray-900">RM {((getMinPrice(bookingWithEvent.event) / 100) * (tickets?.length || 1)).toFixed(2)}</div>
                         <div className="text-xs text-gray-600 font-medium">Not charged to your account</div>
                       </div>
                     </div>

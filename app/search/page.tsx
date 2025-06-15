@@ -1,6 +1,7 @@
 "use client";
 
 import { api } from "@/convex/_generated/api";
+import { Doc } from "@/convex/_generated/dataModel";
 import { useQuery } from "convex/react";
 import { useSearchParams } from "next/navigation";
 import EventCard from "@/components/EventCard";
@@ -20,13 +21,15 @@ export default function SearchPage() {
     );
   }
 
+  type Event = Doc<"events">;
+  
   const upcomingEvents = searchResults
-    .filter((event) => event.event_date > Date.now())
-    .sort((a, b) => a.event_date - b.event_date);
+    .filter((event: Event) => event.event_date > Date.now())
+    .sort((a: Event, b: Event) => a.event_date - b.event_date);
 
   const pastEvents = searchResults
-    .filter((event) => event.event_date <= Date.now())
-    .sort((a, b) => b.event_date - a.event_date);
+    .filter((event: Event) => event.event_date <= Date.now())
+    .sort((a: Event, b: Event) => b.event_date - a.event_date);
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -64,7 +67,7 @@ export default function SearchPage() {
               Upcoming Events
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {upcomingEvents.map((event) => (
+              {upcomingEvents.map((event: Event) => (
                 <EventCard key={event._id} eventId={event._id} />
               ))}
             </div>
@@ -78,7 +81,7 @@ export default function SearchPage() {
               Past Events
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {pastEvents.map((event) => (
+              {pastEvents.map((event: Event) => (
                 <EventCard key={event._id} eventId={event._id} />
               ))}
             </div>

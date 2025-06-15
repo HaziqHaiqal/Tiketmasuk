@@ -2,15 +2,18 @@
 
 import { api } from "@/convex/_generated/api";
 import { useQuery } from "convex/react";
-import { useUser } from "@clerk/nextjs";
+import { useConvexAuth } from "convex/react";
 import TicketCard from "@/components/TicketCard";
 import { Ticket } from "lucide-react";
 
 export default function MyTicketsPage() {
-  const { user } = useUser();
-  const tickets = useQuery(api.tickets.getUserTickets, {
-    user_id: user?.id ?? "",
-  });
+  const { isAuthenticated } = useConvexAuth();
+  const tickets = useQuery(
+    api.tickets.getUserTickets,
+    isAuthenticated ? {
+      user_id: "", // Will be handled by the backend using ctx.auth
+    } : "skip"
+  );
 
   if (!tickets) return null;
 

@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getToyyibPayConfig } from "@/lib/toyyibpay/config";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     // Test configuration loading
     const config = getToyyibPayConfig();
@@ -13,10 +13,10 @@ export async function GET(req: NextRequest) {
       hasSecretKey: !!config.secretKey,
       hasCategoryCode: !!config.categoryCode,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json({
       success: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : "Unknown error",
     }, { status: 400 });
   }
 } 

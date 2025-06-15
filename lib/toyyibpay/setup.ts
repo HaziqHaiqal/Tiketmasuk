@@ -1,4 +1,6 @@
-import { ToyyibPayCategory, ToyyibPayCategoryResponse } from './types';
+import { toyyibpayClient } from './client';
+import { CreateBillOptions } from './types';
+import { ToyyibPayCategory } from './types';
 import { TOYYIBPAY_API_URL, TOYYIBPAY_ENDPOINTS } from './config';
 
 /**
@@ -32,7 +34,11 @@ export class ToyyibPaySetup {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams(categoryData as any).toString(),
+        body: new URLSearchParams({
+          catname: categoryData.catname,
+          catdescription: categoryData.catdescription,
+          userSecretKey: categoryData.userSecretKey,
+        }).toString(),
       });
 
       if (!response.ok) {
@@ -137,6 +143,59 @@ Then restart your development server.
     return categoryCode;
   } catch (error) {
     console.error('Quick setup failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Setup ToyyibPay category
+ * This should be run once to create the category
+ */
+export async function setupToyyibPayCategory() {
+  try {
+    const response = await fetch('https://toyyibpay.com/index.php/api/createCategory', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        userSecretKey: process.env.TOYYIBPAY_SECRET_KEY || '',
+        catname: 'Event Tickets',
+        catdescription: 'Event ticket sales and bookings',
+      }).toString(),
+    });
+
+    const result = await response.text();
+    console.log('Category creation result:', result);
+    return result;
+  } catch (error) {
+    console.error('Error creating category:', error);
+    throw error;
+  }
+}
+
+/**
+ * Test ToyyibPay integration
+ */
+export async function testToyyibPayIntegration() {
+  try {
+    const testBill: CreateBillOptions = {
+      billName: 'Test Bill',
+      billDescription: 'Test payment integration',
+      billAmount: 100, // RM 1.00
+      billReturnUrl: 'https://your-domain.com/payment/success',
+      billCallbackUrl: 'https://your-domain.com/api/webhooks/toyyibpay',
+      billExternalReferenceNo: `test-${Date.now()}`,
+      billTo: 'Test Customer',
+      billEmail: 'test@example.com',
+      billPhone: '0123456789',
+    };
+
+    const result = await toyyibpayClient.createBill(testBill);
+    console.log('Test bill created:', result);
+    return result;
+  } catch (error: unknown) {
+    console.error('Test failed:', error);
     throw error;
   }
 } 

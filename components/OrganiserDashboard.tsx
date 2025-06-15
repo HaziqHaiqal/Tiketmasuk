@@ -1,118 +1,154 @@
 "use client";
-import { useUser } from "@clerk/nextjs";
+
 import { useRouter } from "next/navigation";
 import React from "react";
-import { CalendarDays, Plus, Settings, CreditCard } from "lucide-react";
-import Link from "next/link";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, Calendar, Users, DollarSign, TrendingUp } from "lucide-react";
 
 export default function OrganiserDashboard() {
   const router = useRouter();
-  const { user } = useUser();
+
+
+  const handleCreateEvent = () => {
+    router.push("/organiser/events/create");
+  };
+
+  const handleViewEvents = () => {
+    router.push("/organiser/events");
+  };
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-        {/* Header Section */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-8 text-white">
-          <h2 className="text-2xl font-bold">Organiser Dashboard</h2>
-          <p className="text-blue-100 mt-2">
-            Create and manage your events with ToyyibPay integration
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Organiser Dashboard
+          </h1>
+          <p className="text-gray-600">
+            Manage your events and track your success
           </p>
         </div>
 
-        {/* Main Content */}
-        <div className="p-8">
-          <div className="text-center mb-8">
-            <h3 className="text-2xl font-semibold text-gray-900 mb-4">
-              Start Selling Event Tickets
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Create events and accept payments securely through ToyyibPay
-            </p>
-          </div>
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={handleCreateEvent}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Create Event</CardTitle>
+              <Plus className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">New</div>
+              <p className="text-xs text-muted-foreground">
+                Start planning your next event
+              </p>
+            </CardContent>
+          </Card>
 
-          {/* Action Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {/* Create Event Card */}
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <Plus className="w-6 h-6 text-white" />
-                </div>
-                <div className="ml-4">
-                  <h4 className="text-lg font-semibold text-gray-900">Create New Event</h4>
-                  <p className="text-sm text-gray-600">Set up your next event</p>
-                </div>
-              </div>
-              <Link
-                href="/organiser/new-event"
-                className="block w-full bg-blue-600 text-white text-center py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-              >
-                Create Event
-              </Link>
-            </div>
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={handleViewEvents}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">My Events</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">View All</div>
+              <p className="text-xs text-muted-foreground">
+                Manage your existing events
+              </p>
+            </CardContent>
+          </Card>
 
-            {/* Manage Events Card */}
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center">
-                  <CalendarDays className="w-6 h-6 text-white" />
-                </div>
-                <div className="ml-4">
-                  <h4 className="text-lg font-semibold text-gray-900">My Events</h4>
-                  <p className="text-sm text-gray-600">View and manage events</p>
-                </div>
-              </div>
-              <Link
-                href="/organiser/events"
-                className="block w-full bg-green-600 text-white text-center py-3 rounded-lg font-medium hover:bg-green-700 transition-colors"
-              >
-                View Events
-              </Link>
-            </div>
-          </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Attendees</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">0</div>
+              <p className="text-xs text-muted-foreground">
+                Across all events
+              </p>
+            </CardContent>
+          </Card>
 
-          {/* Payment Information */}
-          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 border border-purple-200">
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center">
-                <CreditCard className="w-6 h-6 text-white" />
-              </div>
-              <div className="ml-4">
-                <h4 className="text-lg font-semibold text-gray-900">Payment Processing</h4>
-                <p className="text-sm text-gray-600">Powered by ToyyibPay</p>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center text-sm text-gray-700">
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                <span>Secure payment processing for Malaysian events</span>
-              </div>
-              <div className="flex items-center text-sm text-gray-700">
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                <span>Support for online banking, credit/debit cards, and e-wallets</span>
-              </div>
-              <div className="flex items-center text-sm text-gray-700">
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                <span>Automatic payment confirmation and ticket delivery</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Setup Note */}
-          <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-start">
-              <Settings className="w-5 h-5 text-blue-600 mt-0.5" />
-              <div className="ml-3">
-                <h5 className="text-sm font-medium text-blue-900">ToyyibPay Setup</h5>
-                <p className="text-sm text-blue-700 mt-1">
-                  To start receiving payments, ensure your ToyyibPay account is configured in the system environment variables. 
-                  Contact your administrator for setup assistance if needed.
-                </p>
-              </div>
-            </div>
-          </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">RM 0</div>
+              <p className="text-xs text-muted-foreground">
+                Total earnings
+              </p>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Getting Started */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Getting Started
+            </CardTitle>
+            <CardDescription>
+              Welcome to Tiketmasuk! Here&apos;s how to get started with your first event.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 border border-gray-200 rounded-lg">
+                <h3 className="font-semibold mb-2">1. Create Your Event</h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  Set up your event details, categories, and pricing tiers.
+                </p>
+                <Button onClick={handleCreateEvent} size="sm">
+                  Create Event
+                </Button>
+              </div>
+              
+              <div className="p-4 border border-gray-200 rounded-lg">
+                <h3 className="font-semibold mb-2">2. Publish & Share</h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  Make your event live and share it with your audience.
+                </p>
+                <Button variant="outline" size="sm" disabled>
+                  Coming Soon
+                </Button>
+              </div>
+              
+              <div className="p-4 border border-gray-200 rounded-lg">
+                <h3 className="font-semibold mb-2">3. Track Sales</h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  Monitor ticket sales and manage attendees.
+                </p>
+                <Button variant="outline" size="sm" disabled>
+                  View Analytics
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Recent Activity */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+            <CardDescription>
+              Your latest events and transactions
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8 text-gray-500">
+              <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No recent activity</p>
+              <p className="text-sm">Create your first event to get started!</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

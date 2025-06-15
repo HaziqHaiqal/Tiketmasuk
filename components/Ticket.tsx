@@ -14,15 +14,13 @@ import QRCode from "react-qr-code";
 import Spinner from "./Spinner";
 import { useStorageUrl } from "@/lib/utils";
 import Image from "next/image";
+import { getMinPrice } from "@/lib/eventUtils";
 
 export default function Ticket({ ticketId }: { ticketId: Id<"tickets"> }) {
-  const ticket = useQuery(api.tickets.getTicketWithDetails, { ticket_id: ticketId });
-  const user = useQuery(api.users.get, {
-    user_id: ticket?.booking?.user_id ?? "",
-  });
+  const ticket = useQuery(api.tickets.getTicketDetails, { ticket_id: ticketId });
   const imageUrl = useStorageUrl(ticket?.event?.image_storage_id);
 
-  if (!ticket || !ticket.event || !user) {
+  if (!ticket || !ticket.event || !ticket.customerProfile) {
     return <Spinner />;
   }
 
@@ -91,8 +89,8 @@ export default function Ticket({ ticketId }: { ticketId: Id<"tickets"> }) {
               />
               <div>
                 <p className="text-sm text-gray-500">Ticket Holder</p>
-                <p className="font-medium">{user.name}</p>
-                <p className="text-sm text-gray-500">{user.email}</p>
+                <p className="font-medium">{ticket.customerProfile.full_name}</p>
+                <p className="text-sm text-gray-500">{ticket.ticketDetails.holder_email}</p>
               </div>
             </div>
 
@@ -102,7 +100,7 @@ export default function Ticket({ ticketId }: { ticketId: Id<"tickets"> }) {
               />
               <div>
                 <p className="text-sm text-gray-500">Ticket Holder ID</p>
-                                  <p className="font-medium">{user.user_id}</p>
+                <p className="font-medium">{ticket.customerProfile.user_id}</p>
               </div>
             </div>
 
@@ -112,7 +110,7 @@ export default function Ticket({ ticketId }: { ticketId: Id<"tickets"> }) {
               />
               <div>
                 <p className="text-sm text-gray-500">Ticket Price</p>
-                <p className="font-medium">RM {ticket.event.price.toFixed(2)}</p>
+                <p className="font-medium">RM {(getMinPrice(ticket.event) / 100).toFixed(2)}</p>
               </div>
             </div>
           </div>
@@ -122,10 +120,10 @@ export default function Ticket({ ticketId }: { ticketId: Id<"tickets"> }) {
             <div
               className={`bg-gray-100 p-4 rounded-lg ${ticket.event.is_cancelled ? "opacity-50" : ""}`}
             >
-              <QRCode value={ticket._id} className="w-32 h-32" />
+              <QRCode value={ticket.ticketDetails._id} className="w-32 h-32" />
             </div>
             <p className="mt-2 text-sm text-gray-500 break-all text-center max-w-[200px] md:max-w-full">
-              Ticket ID: {ticket._id}
+              Ticket ID: {ticket.ticketDetails._id}
             </p>
           </div>
         </div>
@@ -155,7 +153,7 @@ export default function Ticket({ ticketId }: { ticketId: Id<"tickets"> }) {
         className={`${ticket.event.is_cancelled ? "bg-red-50" : "bg-gray-50"} px-6 py-4 flex justify-between items-center`}
       >
         <span className="text-sm text-gray-500">
-                      Purchase Date: {new Date(ticket.issued_at).toLocaleString()}
+          Purchase Date: {new Date(ticket.ticketDetails.issued_at).toLocaleString()}
         </span>
         <span
           className={`text-sm font-medium ${ticket.event.is_cancelled ? "text-red-600" : "text-blue-600"}`}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useQuery } from "convex/react";
 import { Id } from "@/convex/_generated/dataModel";
@@ -13,9 +13,7 @@ import {
   Clock,
   ArrowRight,
   Trash2,
-  User,
-  ShoppingCart,
-  CheckCircle
+  ShoppingCart
 } from "lucide-react";
 import { useStorageUrl } from "@/lib/utils";
 import { clearCheckoutSessionData } from "@/lib/utils";
@@ -25,23 +23,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { getMinPrice } from "@/lib/eventUtils";
 
 function CartContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, isLoaded } = useUser();
+  const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   
   const eventId = searchParams.get("eventId") as Id<"events">;
   const waitingListId = searchParams.get("waitingListId") as Id<"waiting_list">;
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState("");
 
   const event = useQuery(api.events.getById, { event_id: eventId });
-  const queuePosition = useQuery(api.waitingList.getQueuePosition, {
-    event_id: eventId,
-    user_id: user?.id ?? "",
-  });
+  const queuePosition = useQuery(
+    api.waitingList.getQueuePosition,
+    isAuthenticated ? {
+      event_id: eventId,
+      user_id: "", // Will be handled by the backend using ctx.auth
+    } : "skip"
+  );
   
   const imageUrl = useStorageUrl(event?.image_storage_id);
 
@@ -49,16 +51,6 @@ function CartContent() {
   const hasValidOffer = queuePosition?.status === "offered";
   const offerExpiresAt = queuePosition?.offer_expires_at ?? 0;
   const isExpired = Date.now() > offerExpiresAt;
-
-  // Handle timer expiration
-  useEffect(() => {
-    if (hasValidOffer && isExpired) {
-      // Clear all session storage data when timer expires
-      clearCheckoutSessionData();
-      // Redirect to event page when timer expires
-      router.push(`/event/${eventId}`);
-    }
-  }, [hasValidOffer, isExpired, eventId, router]);
 
   useEffect(() => {
     if (!hasValidOffer || isExpired) return;
@@ -105,14 +97,14 @@ function CartContent() {
     router.push(`/event/${eventId}`);
   };
 
-  // Wait for Clerk to load
-  if (!isLoaded) {
+  // Wait for auth to load
+  if (authLoading) {
     return <Spinner />;
   }
 
-  // Redirect to Clerk sign-in if not authenticated
-  if (!user) {
-    window.location.href = '/sign-in';
+  // Redirect to auth if not authenticated
+  if (!isAuthenticated) {
+    window.location.href = '/auth-test';
     return <Spinner />;
   }
 
@@ -237,7 +229,7 @@ function CartContent() {
                         <p className="text-sm text-gray-600">Standard entry ticket</p>
                       </div>
                       <div className="text-right">
-                        <div className="font-semibold text-lg text-gray-900">RM {(event.price * queuePosition.quantity).toFixed(2)}</div>
+                        <div className="font-semibold text-lg text-gray-900">RM {((getMinPrice(event) / 100) * queuePosition.quantity).toFixed(2)}</div>
                         <div className="text-sm text-gray-600">Qty: {queuePosition.quantity}</div>
                       </div>
                     </div>
@@ -293,7 +285,7 @@ function CartContent() {
                                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
                       <span>Ticket × {queuePosition.quantity}</span>
-                      <span>RM {(event.price * queuePosition.quantity).toFixed(2)}</span>
+                      <span>RM {((getMinPrice(event) / 100) * queuePosition.quantity).toFixed(2)}</span>
                     </div>
                   <div className="flex justify-between text-sm">
                     <span>Service Fee</span>
@@ -302,7 +294,7 @@ function CartContent() {
                   <Separator />
                   <div className="flex justify-between font-semibold">
                     <span>Total</span>
-                    <span>RM {(event.price * queuePosition.quantity).toFixed(2)}</span>
+                    <span>RM {((getMinPrice(event) / 100) * queuePosition.quantity).toFixed(2)}</span>
                   </div>
                 </div>
 

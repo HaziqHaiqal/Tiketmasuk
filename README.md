@@ -1,144 +1,135 @@
-# Tiketmasuk - Real-time Event Ticketing Platform
+# Tiketmasuk
 
-A modern, real-time event ticketing platform built with Next.js 14, Convex, Clerk, and ToyyibPay. Features a sophisticated queue system, real-time updates, and secure payment processing.
+A modern, real-time event ticketing platform built with Next.js 14, Convex, Convex Auth, and ToyyibPay. Features a sophisticated queue system, real-time updates, and secure payment processing.
 
-### Environment Variable
-Create a ```.env.local``` file with:
-```
-# App URL
-NEXT_PUBLIC_APP_URL=http://localhost:3000 # Change in production
+## Environment Variables
 
-# Clerk Authentication (https://clerk.com)
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
-CLERK_SECRET_KEY=
+Create a `.env.local` file in the root directory with the following variables:
 
-# Convex (https://convex.dev)
-NEXT_PUBLIC_CONVEX_URL=
+```bash
+# Convex Configuration
 CONVEX_DEPLOYMENT=
+NEXT_PUBLIC_CONVEX_URL=
 
-# ToyyibPay (https://toyyibpay.com)
+# Convex Auth Configuration (https://labs.convex.dev/auth)
+AUTH_GOOGLE_ID=
+AUTH_GOOGLE_SECRET=
+AUTH_FACEBOOK_ID=
+AUTH_FACEBOOK_SECRET=
+AUTH_RESEND_KEY=
+
+# ToyyibPay Configuration (https://toyyibpay.com)
 TOYYIBPAY_SECRET_KEY=
 TOYYIBPAY_CATEGORY_CODE=
-TOYYIBPAY_SANDBOX=true
-```
+NEXT_PUBLIC_TOYYIBPAY_USER_SECRET_KEY=
 
-### Installation
-The ```.next``` folder and ```node_modules``` will be created automatically during installation and build.
-```
-# Install dependencies
-pnpm install
-
-# In a separate terminal, set up Convex (if not already deployed)
-pnpm convex
-
-# Build the project
-pnpm build
-
-# Start the development server
-pnpm dev
+# Application Configuration
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
 ```
 
 ## Features
 
-### For Event Attendees
+- 🎫 **Event Management** - Create and manage events with multiple ticket categories and pricing tiers
+- 🔐 **Multi-Auth System** - Google OAuth, Facebook OAuth, Magic Links, and Password authentication
+- ⏰ **Real-time Queue System** - Fair ticket allocation with time-limited offers
+- 💳 **Secure Payments** - Integration with ToyyibPay for Malaysian market
+- 📱 **Responsive Design** - Mobile-first approach with modern UI
+- 🎟️ **Digital Tickets** - QR code generation and validation
+- 📊 **Analytics Dashboard** - Real-time event and sales analytics
+- 🔔 **Real-time Updates** - Live queue position and ticket availability
 
+## Tech Stack
 
-- 🎫 Real-time ticket availability tracking
-- ⚡ Smart queuing system with position updates
-- 🕒 Time-limited ticket offers
-- 📱 Mobile-friendly ticket management
-- 🔒 Secure payment processing with ToyyibPay
-- 📲 Digital tickets with QR codes
-- 💸 Automatic refunds for cancelled events
+- **Frontend**: Next.js 14, React 18, TypeScript, Tailwind CSS
+- **Backend**: Convex (Database + Backend Functions)
+- **Authentication**: Convex Auth with OAuth providers (Google, Facebook) + Magic Links + Passwords
+- **Payments**: ToyyibPay (Malaysian payment gateway)
+- **UI Components**: Radix UI, Lucide Icons
+- **Forms**: React Hook Form with Zod validation
 
-### For Event Organizers
+## Getting Started
 
-- 💰 Direct payments via ToyyibPay
-- 📊 Real-time sales monitoring
-- 🎯 Automated queue management
-- 📈 Event analytics and tracking
-- 🔄 Automatic ticket recycling
-- 🎟️ Customizable ticket limits
-- ❌ Event cancellation with automatic refunds
-- 🔄 Bulk refund processing
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/tiketmasuk.git
+   cd tiketmasuk
+   ```
 
-### Technical Features
+2. **Install dependencies**
+   ```bash
+   npm install
+   # or
+   pnpm install
+   ```
 
-- 🚀 Real-time updates using Convex
-- 👤 Authentication with Clerk
-- 💳 Payment processing with ToyyibPay
-- 🌐 Server-side and client-side rendering
-- 🎨 Modern UI with Tailwind CSS and shadcn/ui
-- 📱 Responsive design
-- 🛡️ Rate limiting for queue joins and purchases
-- 🔒 Automated fraud prevention
-- 🔔 Toast notifications for real-time feedback
-- ✨ Beautiful, accessible components with shadcn/ui
+3. **Set up Convex**
+   ```bash
+   npx convex dev
+   ```
 
-### UI/UX Features
+4. **Configure environment variables**
+   - Copy `.env.local.example` to `.env.local`
+   - Fill in your Convex, OAuth, and ToyyibPay credentials
 
-- 🎯 Instant feedback with toast notifications
-- 🎨 Consistent design system using shadcn/ui
-- ♿ Fully accessible components
-- 🎭 Animated transitions and feedback
-- 📱 Responsive design across all devices
-- 🔄 Loading states and animations
-- 💫 Micro-interactions for better engagement
+5. **Run the development server**
+   ```bash
+   npm run dev
+   # or
+   pnpm dev
+   ```
 
+6. **Open your browser**
+   Navigate to [http://localhost:3000](http://localhost:3000)
 
-## Architecture
+## Authentication Setup
 
-### Database Schema
+### Google OAuth
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing
+3. Enable Google+ API
+4. Create OAuth 2.0 credentials
+5. Add authorized redirect URI: `https://your-convex-site.convex.site/api/auth/callback/google`
 
-- Events
-- Tickets
-- Waiting List
-- Users
+### Facebook OAuth
+1. Go to [Facebook Developers](https://developers.facebook.com/)
+2. Create a new app
+3. Add Facebook Login product
+4. Configure OAuth redirect URI: `https://your-convex-site.convex.site/api/auth/callback/facebook`
 
-### Key Components
+### Magic Links (Resend)
+1. Sign up at [Resend](https://resend.com/)
+2. Get your API key
+3. Set `AUTH_RESEND_KEY` in your environment variables
 
-- Real-time queue management
-- Rate limiting
-- Automated offer expiration
-- Payment processing
-- User synchronization
+## Payment Integration
 
-## Usage
+This project uses ToyyibPay for payment processing in Malaysia:
 
-### Creating an Event
+1. Sign up at [ToyyibPay](https://toyyibpay.com/)
+2. Get your API credentials
+3. Configure the environment variables
+4. Test with sandbox mode first
 
-1. Sign up as an event organizer
-2. Ensure ToyyibPay integration is configured
-3. Create event with details and ticket quantity
-4. Publish event
+## Database Schema
 
-### Purchasing Tickets
+The application uses Convex with the following main tables:
+- `users` - User authentication (managed by Convex Auth)
+- `customer_profiles` - Customer-specific data
+- `organizer_profiles` - Event organizer data
+- `events` - Event information with embedded categories and pricing
+- `bookings` - Booking records with embedded items
+- `tickets` - Individual ticket records
+- `payments` - Payment transaction records
+- `waiting_list` - Queue management for ticket allocation
 
-1. Browse available events
-2. Join queue for desired event
-3. Receive ticket offer
-4. Complete purchase within time limit
-5. Access digital ticket with QR cod
+## Contributing
 
-### Handling Refunds and Cancellations
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-1. Event organizers can cancel events from their dashboard
-2. System automatically processes refunds for all ticket holders
-3. Refund status can be tracked in user dashboard
+## License
 
-### User Experience
-
-1. Real-time Feedback
-
-   - Instant purchase confirmations
-   - Queue position updates
-   - Error notifications
-   - Success page
-   - Ticket status
-
-2. Interactive Elements
-   - Animated buttons and cards
-   - Loading states
-   - Progress indicators
-   - Skeleton loaders
-   - Smooth transitions
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

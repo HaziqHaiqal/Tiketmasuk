@@ -1,4 +1,3 @@
-import { headers } from "next/headers";
 import { getConvexClient } from "@/lib/convex";
 import { api } from "@/convex/_generated/api";
 import { NextRequest } from "next/server";
@@ -37,29 +36,23 @@ export async function POST(req: NextRequest) {
     if (statusId === "1") {
       // Status 1: Successful payment - update payment and booking status
       try {
-        await convex.mutation(api.payments.updatePaymentStatus, {
-          bill_code: billCode,
-          status: "completed",
-          transaction_reference: transactionId || orderId || billCode,
-          provider_response: {
-            billcode: billCode,
-            status_id: statusId,
-            order_id: orderId,
-            msg: msg,
-            transaction_id: transactionId
-          }
-        });
-
-        // Get the payment to find the booking
-        const payment = await convex.query(api.payments.getPaymentByBillCode, {
-          bill_code: billCode
+        // Find payment by transaction reference (billCode is used as transaction reference)
+        const payment = await convex.query(api.payments.getPaymentByTransactionReference, {
+          transaction_reference: billCode
         });
 
         if (payment) {
-          // Update booking status to completed
-          await convex.mutation(api.bookings.updateStatus, {
-            booking_id: payment.booking_id,
-            status: "completed"
+          await convex.mutation(api.payments.updatePaymentStatus, {
+            payment_id: payment._id,
+            status: "completed",
+            transaction_reference: transactionId || orderId || billCode,
+            payment_response: JSON.stringify({
+              billcode: billCode,
+              status_id: statusId,
+              order_id: orderId,
+              msg: msg,
+              transaction_id: transactionId
+            })
           });
         }
       } catch (error) {
@@ -69,28 +62,22 @@ export async function POST(req: NextRequest) {
     } else {
       // Status 0, 2, 3: Failed, cancelled, or other unsuccessful statuses
       try {
-        await convex.mutation(api.payments.updatePaymentStatus, {
-          bill_code: billCode,
-          status: "failed",
-          provider_response: {
-            billcode: billCode,
-            status_id: statusId,
-            order_id: orderId,
-            msg: msg,
-            transaction_id: transactionId
-          }
-        });
-
-        // Get the payment to find the booking
-        const payment = await convex.query(api.payments.getPaymentByBillCode, {
-          bill_code: billCode
+        // Find payment by transaction reference (billCode is used as transaction reference)
+        const payment = await convex.query(api.payments.getPaymentByTransactionReference, {
+          transaction_reference: billCode
         });
 
         if (payment) {
-          // Update booking status to cancelled
-          await convex.mutation(api.bookings.updateStatus, {
-            booking_id: payment.booking_id,
-            status: "cancelled"
+          await convex.mutation(api.payments.updatePaymentStatus, {
+            payment_id: payment._id,
+            status: "failed",
+            payment_response: JSON.stringify({
+              billcode: billCode,
+              status_id: statusId,
+              order_id: orderId,
+              msg: msg,
+              transaction_id: transactionId
+            })
           });
         }
       } catch (error) {

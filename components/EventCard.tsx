@@ -13,25 +13,39 @@ import {
   PencilIcon,
   StarIcon,
 } from "lucide-react";
-import { useUser } from "@clerk/nextjs";
+import { useConvexAuth } from "convex/react";
 import PurchaseTicket from "./PurchaseTicket";
 import { useRouter } from "next/navigation";
 import { useStorageUrl } from "@/lib/utils";
+import { getMinPrice } from "@/lib/eventUtils";
 import Image from "next/image";
 
 export default function EventCard({ eventId }: { eventId: Id<"events"> }) {
-  const { user } = useUser();
+  const { isAuthenticated } = useConvexAuth();
   const router = useRouter();
   const event = useQuery(api.events.getById, { event_id: eventId });
   const availability = useQuery(api.events.getEventAvailability, { event_id: eventId });
-  const userTicket = useQuery(api.tickets.getUserTicketForEvent, {
-    event_id: eventId,
-    user_id: user?.id ?? "",
-  });
-  const queuePosition = useQuery(api.waitingList.getQueuePosition, {
-    event_id: eventId,
-    user_id: user?.id ?? "",
-  });
+  const userTicket = useQuery(
+    api.tickets.getUserTicketForEvent,
+    isAuthenticated ? {
+      event_id: eventId,
+      user_id: "", // Will be handled by the backend using ctx.auth
+    } : "skip"
+  );
+  const queuePosition = useQuery(
+    api.waitingList.getQueuePosition,
+    isAuthenticated ? {
+      event_id: eventId,
+      user_id: "", // Will be handled by the backend using ctx.auth
+    } : "skip"
+  );
+  const isEventOwner = useQuery(
+    api.events.isUserEventOwner,
+    isAuthenticated ? {
+      event_id: eventId,
+      user_id: "", // Will be handled by the backend using ctx.auth
+    } : "skip"
+  );
   const imageUrl = useStorageUrl(event?.image_storage_id);
 
   if (!event || !availability) {
@@ -39,10 +53,6 @@ export default function EventCard({ eventId }: { eventId: Id<"events"> }) {
   }
 
   const isPastEvent = event.event_date < Date.now();
-
-  // For now, we'll check if user owns this event by checking vendor relationship
-  // This is a temporary solution until we have proper event ownership in the schema
-  const isEventOwner = false; // TODO: Implement proper event ownership check
 
   const renderQueuePosition = () => {
     if (!queuePosition || queuePosition.status !== "waiting") return null;
@@ -90,7 +100,7 @@ export default function EventCard({ eventId }: { eventId: Id<"events"> }) {
   };
 
   const renderTicketStatus = () => {
-    if (!user) return null;
+    if (!isAuthenticated) return null;
 
     if (isEventOwner) {
       return (
@@ -192,7 +202,7 @@ export default function EventCard({ eventId }: { eventId: Id<"events"> }) {
               } transition-all duration-200`}>
                 <span className="relative z-10 flex items-center gap-1.5">
                   <span className="text-base">RM</span>
-                  <span className="text-lg">{event.price.toFixed(2)}</span>
+                  <span className="text-lg">{(getMinPrice(event) / 100).toFixed(2)}</span>
                 </span>
                 <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               </div>

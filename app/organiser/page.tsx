@@ -1,14 +1,27 @@
+"use client";
+
+import { useConvexAuth } from "convex/react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import OrganiserDashboard from "@/components/OrganiserDashboard";
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
 
-export default async function OrganiserPage() {
-  const { userId } = await auth();
-  if (!userId) redirect("/");
+export default function OrganiserPage() {
+  const { isAuthenticated, isLoading } = useConvexAuth();
+  const router = useRouter();
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <OrganiserDashboard />
-    </div>
-  );
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/auth-test");
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  return <OrganiserDashboard />;
 }

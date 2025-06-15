@@ -8,13 +8,15 @@ import { CalendarDays, MapPin, Ticket, Users } from "lucide-react";
 import { useParams } from "next/navigation";
 import Spinner from "@/components/Spinner";
 import JoinQueue from "@/components/JoinQueue";
-import { useUser, SignInButton } from "@clerk/nextjs";
+import { useConvexAuth } from "convex/react";
 import { useStorageUrl } from "@/lib/utils";
+import { getMinPrice } from "@/lib/eventUtils";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 function EventPage() {
-    const { user } = useUser();
+    const { isAuthenticated } = useConvexAuth();
     const params = useParams();
     
     const event = useQuery(api.events.getById, {
@@ -84,7 +86,7 @@ function EventPage() {
                                             <Ticket className="w-5 h-5 mr-2 text-blue-600" />
                                             <span className="text-sm font-medium">Price</span>
                                         </div>
-                                        <p className="text-gray-900">RM {event.price.toFixed(2)}</p>
+                                        <p className="text-gray-900">RM {(getMinPrice(event) / 100).toFixed(2)}</p>
                                     </div>
 
                                     <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
@@ -117,17 +119,17 @@ function EventPage() {
                                 <div className="sticky top-8 space-y-4">
                                     <EventCard eventId={params.id as Id<"events">} />
 
-                                    {user ? (
+                                    {isAuthenticated ? (
                                         <JoinQueue
                                             eventId={params.id as Id<"events">}
-                                            userId={user.id}
+                                            userId="" // Will be handled by the backend using ctx.auth
                                         />
                                     ) : (
-                                        <SignInButton>
+                                        <Link href="/auth-test">
                                             <Button className="w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg">
                                                 Sign in to buy tickets
                                             </Button>
-                                        </SignInButton>
+                                        </Link>
                                     )}
                                 </div>
                             </div>

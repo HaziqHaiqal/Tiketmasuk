@@ -3,7 +3,7 @@
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useQuery } from "convex/react";
-import { useUser } from "@clerk/nextjs";
+import { useConvexAuth } from "convex/react";
 import { redirect, useParams } from "next/navigation";
 import Ticket from "@/components/Ticket";
 import Link from "next/link";
@@ -12,24 +12,23 @@ import { useEffect } from "react";
 
 export default function TicketPage() {
   const params = useParams();
-  const { user } = useUser();
-  const ticket = useQuery(api.tickets.getTicketWithDetails, {
+  const { isAuthenticated } = useConvexAuth();
+  const ticket = useQuery(api.tickets.getTicketDetails, {
     ticket_id: params.id as Id<"tickets">,
   });
 
   useEffect(() => {
-    if (!user) {
+    if (!isAuthenticated) {
       redirect("/");
     }
 
-    if (!ticket || ticket.booking?.user_id !== user.id) {
-      redirect("/tickets");
-    }
+    // Note: User ownership validation will be handled by the backend
+    // since Convex Auth doesn't provide the same user profile structure as Clerk
 
-    if (!ticket.event) {
+    if (!ticket?.event) {
       redirect("/tickets");
     }
-  }, [user, ticket]);
+  }, [isAuthenticated, ticket]);
 
   if (!ticket || !ticket.event) {
     return null;
@@ -82,7 +81,7 @@ export default function TicketPage() {
                 {ticket.event.is_cancelled ? "Cancelled" : "Valid Ticket"}
               </span>
               <span className="text-sm text-gray-500">
-                Purchased on {new Date(ticket.issued_at).toLocaleDateString()}
+                Purchased on {new Date(ticket.ticketDetails.issued_at).toLocaleDateString()}
               </span>
             </div>
             {ticket.event.is_cancelled && (
@@ -95,7 +94,7 @@ export default function TicketPage() {
         </div>
 
         {/* Ticket Component */}
-        <Ticket ticketId={ticket._id} />
+        <Ticket ticketId={ticket.ticketDetails._id} />
 
         {/* Additional Information */}
         <div
