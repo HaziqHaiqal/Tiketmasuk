@@ -1,5 +1,3 @@
-import { toyyibpayClient } from './client';
-import { CreateBillOptions } from './types';
 import { ToyyibPayCategory } from './types';
 import { TOYYIBPAY_API_URL, TOYYIBPAY_ENDPOINTS } from './config';
 
@@ -58,23 +56,7 @@ export class ToyyibPaySetup {
     }
   }
 
-  /**
-   * Test connection to ToyyibPay API
-   */
-  async testConnection(): Promise<boolean> {
-    try {
-      // Try to create a test category to verify the connection
-      const testCategoryCode = await this.createCategory(
-        `Test Category ${Date.now()}`,
-        'Test category for connection verification'
-      );
-      console.log('ToyyibPay connection test successful. Category code:', testCategoryCode);
-      return true;
-    } catch (error) {
-      console.error('ToyyibPay connection test failed:', error);
-      return false;
-    }
-  }
+
 
   /**
    * Get configuration status
@@ -174,28 +156,4 @@ export async function setupToyyibPayCategory() {
   }
 }
 
-/**
- * Test ToyyibPay integration
- */
-export async function testToyyibPayIntegration() {
-  try {
-    const testBill: CreateBillOptions = {
-      billName: 'Test Bill',
-      billDescription: 'Test payment integration',
-      billAmount: 100, // RM 1.00
-      billReturnUrl: 'https://your-domain.com/payment/success',
-      billCallbackUrl: 'https://your-domain.com/api/webhooks/toyyibpay',
-      billExternalReferenceNo: `test-${Date.now()}`,
-      billTo: 'Test Customer',
-      billEmail: 'test@example.com',
-      billPhone: '0123456789',
-    };
-
-    const result = await toyyibpayClient.createBill(testBill);
-    console.log('Test bill created:', result);
-    return result;
-  } catch (error: unknown) {
-    console.error('Test failed:', error);
-    throw error;
-  }
-} 
+ 

@@ -34,7 +34,7 @@ export default function OrganizerProfileImages({
   }>({});
 
   // Convex mutations for image management
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const generateUploadUrl = useMutation(api.storage.generateUploadUrl);
   const updateOrganizerImages = useMutation(api.organizers.updateImages);
   const deleteOrganizerImage = useMutation(api.organizers.deleteImage);
 
