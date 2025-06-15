@@ -160,18 +160,24 @@ export default function EventCard({ eventId }: { eventId: Id<"events"> }) {
       }`}
     >
       {/* Event Image */}
-      {imageUrl && (
-        <div className="relative w-full h-48">
-          <Image
-            src={imageUrl}
-            alt={event.name}
-            fill
-            className="object-cover"
-            priority
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-        </div>
-      )}
+      <div className="relative w-full h-48">
+        {imageUrl ? (
+          <>
+            <Image
+              src={imageUrl}
+              alt={event.name}
+              fill
+              className="object-cover"
+              priority
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+          </>
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+            <CalendarDays className="w-16 h-16 text-gray-400" />
+          </div>
+        )}
+      </div>
 
       <div className={`p-6 ${imageUrl ? "relative" : ""}`}>
         <div className="flex justify-between items-start">

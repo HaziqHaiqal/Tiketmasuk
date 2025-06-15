@@ -114,7 +114,7 @@ export const searchEvents = query({
     // Filter by search query
     if (args.query) {
       const searchTerm = args.query.toLowerCase();
-      events = events.filter(event => 
+      events = events.filter(event =>
         event.name.toLowerCase().includes(searchTerm) ||
         event.description.toLowerCase().includes(searchTerm) ||
         event.location.toLowerCase().includes(searchTerm)
@@ -123,7 +123,7 @@ export const searchEvents = query({
 
     // Filter by location
     if (args.location) {
-      events = events.filter(event => 
+      events = events.filter(event =>
         event.location.toLowerCase().includes(args.location!.toLowerCase())
       );
     }
@@ -391,18 +391,18 @@ export const getEventCategories = query({
         pricing_tiers: category.pricing_tiers
           .filter(tier => {
             if (!tier.is_active) return false;
-            
+
             // Check time-based availability
             if (tier.availability_type === "time_based") {
               if (tier.sale_start_date && now < tier.sale_start_date) return false;
               if (tier.sale_end_date && now > tier.sale_end_date) return false;
             }
-            
+
             // Check quantity-based availability
             if (tier.availability_type === "quantity_based") {
               if (tier.max_tickets && tier.tickets_sold && tier.tickets_sold >= tier.max_tickets) return false;
             }
-            
+
             return true;
           })
           .sort((a, b) => a.sort_order - b.sort_order)
@@ -430,18 +430,18 @@ export const getBestPricingTier = query({
     const availableTiers = category.pricing_tiers
       .filter(tier => {
         if (!tier.is_active) return false;
-        
+
         // Check time-based availability
         if (tier.availability_type === "time_based") {
           if (tier.sale_start_date && now < tier.sale_start_date) return false;
           if (tier.sale_end_date && now > tier.sale_end_date) return false;
         }
-        
+
         // Check quantity-based availability
         if (tier.availability_type === "quantity_based") {
           if (tier.max_tickets && tier.tickets_sold && tier.tickets_sold >= tier.max_tickets) return false;
         }
-        
+
         return true;
       })
       .sort((a, b) => a.sort_order - b.sort_order);
@@ -539,11 +539,11 @@ export const search = query({
 
     // Simple text search in name, description, and location
     const searchTerm = args.searchTerm.toLowerCase();
-    return events.filter(event => 
+    return events.filter(event =>
       !event.is_cancelled &&
       (event.name.toLowerCase().includes(searchTerm) ||
-       event.description.toLowerCase().includes(searchTerm) ||
-       event.location.toLowerCase().includes(searchTerm))
+        event.description.toLowerCase().includes(searchTerm) ||
+        event.location.toLowerCase().includes(searchTerm))
     );
   },
 });
@@ -588,7 +588,7 @@ export const get = query({
       .query("events")
       .withIndex("by_status", (q) => q.eq("is_published", true))
       .collect();
-    
+
     // Filter out cancelled events in JavaScript
     return events.filter(event => !event.is_cancelled);
   },
@@ -647,7 +647,7 @@ export const update = mutation({
  * Check if a user is the organizer/owner of an event
  */
 export const isUserEventOwner = query({
-  args: { 
+  args: {
     event_id: v.id("events"),
     user_id: v.string(),
   },
@@ -680,7 +680,7 @@ export const createEventFromOrganizerInput = mutation({
     time: v.string(), // "07:00"
     location: v.string(),
     image_url: v.optional(v.string()),
-    
+
     // Categories with simple pricing tiers
     categories: v.array(v.object({
       name: v.string(),
@@ -772,4 +772,4 @@ export const createEventFromOrganizerInput = mutation({
 
     return eventId;
   },
-}); 
+});
