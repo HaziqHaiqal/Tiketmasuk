@@ -33,7 +33,7 @@ export const { auth, signIn, signOut, store } = convexAuth({
       },
     }),
     Resend({
-      from: "noreply@tiketmasuk.com", // You can customize this
+      from: "noreply@staging.tiketmasuk.my",
     }),
   ],
 }); 

@@ -214,7 +214,7 @@ export default function LoginPage() {
                 href="/auth/register"
                 className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
               >
-                Sign up for free
+                Sign Up
               </Link>
             </div>
           </CardContent>
