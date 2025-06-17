@@ -7,24 +7,28 @@ A modern, real-time event ticketing platform built with Next.js 14, Convex, Conv
 Create a `.env.local` file in the root directory with the following variables:
 
 ```bash
-# Convex Configuration
-CONVEX_DEPLOYMENT=
+# App URL
+NEXT_PUBLIC_APP_URL=http://localhost:3000 # Change in production
+
+# Convex (https://convex.dev)
 NEXT_PUBLIC_CONVEX_URL=
+CONVEX_DEPLOYMENT=
 
-# Convex Auth Configuration (https://labs.convex.dev/auth)
-AUTH_GOOGLE_ID=
-AUTH_GOOGLE_SECRET=
-AUTH_FACEBOOK_ID=
-AUTH_FACEBOOK_SECRET=
-AUTH_RESEND_KEY=
-
-# ToyyibPay Configuration (https://toyyibpay.com)
+# ToyyibPay (https://toyyibpay.com)
 TOYYIBPAY_SECRET_KEY=
 TOYYIBPAY_CATEGORY_CODE=
-NEXT_PUBLIC_TOYYIBPAY_USER_SECRET_KEY=
+TOYYIBPAY_SANDBOX=true
 
-# Application Configuration
-NEXT_PUBLIC_BASE_URL=http://localhost:3000
+# Google OAuth (https://console.cloud.google.com):
+AUTH_GOOGLE_ID=
+AUTH_GOOGLE_SECRET=
+
+# Facebook OAuth (https://developers.facebook.com):
+AUTH_FACEBOOK_ID=
+AUTH_FACEBOOK_SECRET=
+
+# Resend (https://resend.com)
+AUTH_RESEND_KEY=
 ```
 
 ## Features
