@@ -1,21 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import { Authenticated, Unauthenticated } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import logo from "@/images/tiketmasuk-logo-dark.png";
 import SearchBar from "./SearchBar";
+import { AuthModalManager, AuthModalType } from "./auth/AuthModalManager";
 
 const LOGO_CONFIG = {
   width: 224,
   height: 224,
-  mobileWidth: 224, // w-56 = 14rem = 224px
+  mobileWidth: 180, // Reduced from 224 to 180px for better mobile appearance
   desktopWidth: 200, // w-50 = 12.5rem = 200px
 } as const;
 
 function Header() {
   const { signOut } = useAuthActions();
+  const [authModal, setAuthModal] = useState<AuthModalType>(null);
 
   return (
     <header className="border-b">
@@ -27,7 +30,7 @@ function Header() {
               alt="Tiketmasuk Logo"
               width={LOGO_CONFIG.width}
               height={LOGO_CONFIG.height}
-              className="w-56 lg:w-50 object-contain"
+              className="w-44 lg:w-48 object-contain rounded-lg"
               quality={100}
               priority
               sizes={`(max-width: 768px) ${LOGO_CONFIG.mobileWidth}px, ${LOGO_CONFIG.desktopWidth}px`}
@@ -44,11 +47,20 @@ function Header() {
               </button>
             </Authenticated>
             <Unauthenticated>
-              <Link href="/auth/login">
-                <button className="bg-gray-100 text-gray-800 px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 transition border border-gray-300">
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setAuthModal("login")}
+                  className="bg-gray-100 text-gray-800 px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 transition border border-gray-300"
+                >
                   Sign In
                 </button>
-              </Link>
+                <button 
+                  onClick={() => setAuthModal("register")}
+                  className="bg-blue-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-blue-700 transition"
+                >
+                  Sign Up
+                </button>
+              </div>
             </Unauthenticated>
           </div>
         </div>
@@ -83,11 +95,20 @@ function Header() {
           </Authenticated>
 
           <Unauthenticated>
-            <Link href="/auth/login">
-              <button className="bg-gray-100 text-gray-800 px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 transition border border-gray-300">
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setAuthModal("login")}
+                className="bg-gray-100 text-gray-800 px-3 py-1.5 text-sm rounded-lg hover:bg-gray-200 transition border border-gray-300"
+              >
                 Sign In
               </button>
-            </Link>
+              <button 
+                onClick={() => setAuthModal("register")}
+                className="bg-blue-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-blue-700 transition"
+              >
+                Sign Up
+              </button>
+            </div>
           </Unauthenticated>
         </div>
 
@@ -108,6 +129,12 @@ function Header() {
           </Authenticated>
         </div>
       </div>
+
+      {/* Auth Modals */}
+      <AuthModalManager 
+        open={authModal} 
+        onOpenChange={setAuthModal} 
+      />
     </header>
   );
 }
