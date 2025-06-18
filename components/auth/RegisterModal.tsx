@@ -224,7 +224,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
         <div className="p-8 space-y-6">
           {/* Account Type Selection - Tab Style */}
           <div className="space-y-4">
-            <Label className="text-lg font-semibold text-gray-900 block text-center">Select Account Type</Label>
+            <h3 className="text-lg font-semibold text-gray-900 block text-center">Select Account Type</h3>
             <div className="border-b border-gray-200">
               <nav className="-mb-px flex w-full" aria-label="Tabs">
                 <button
@@ -348,6 +348,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                     placeholder="Enter your full name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    autoComplete="name"
                     className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
                     required
                   />
@@ -367,6 +368,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                   placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
                   className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
                   required
                 />
@@ -386,6 +388,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                   placeholder="Create a password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="new-password"
                   className="pl-12 pr-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
                   required
                 />
@@ -411,6 +414,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                   placeholder="Confirm your password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
                   className="pl-12 pr-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
                   required
                 />
@@ -475,6 +479,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                           placeholder="e.g., ABC Corp, XYZ Foundation"
                           value={displayName}
                           onChange={(e) => setDisplayName(e.target.value)}
+                          autoComplete="organization"
                           className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
                           required
                         />
@@ -495,6 +500,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                           placeholder="e.g., ABC Development Corporation"
                           value={fullName}
                           onChange={(e) => setFullName(e.target.value)}
+                          autoComplete="organization-title"
                           className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
                           required
                         />
@@ -515,6 +521,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                           placeholder="e.g., ABC Store, Premium Hub"
                           value={storeName}
                           onChange={(e) => setStoreName(e.target.value)}
+                          autoComplete="off"
                           className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
                           required
                         />
@@ -536,6 +543,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                           placeholder="City, State/Province, Country"
                           value={primaryLocation}
                           onChange={(e) => setPrimaryLocation(e.target.value)}
+                          autoComplete="address-level1"
                           className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
                           required
                         />
@@ -556,6 +564,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                           placeholder="Your contact number"
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
+                          autoComplete="tel"
                           className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
                           required
                         />

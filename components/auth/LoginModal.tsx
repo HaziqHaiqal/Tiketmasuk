@@ -168,6 +168,7 @@ export function LoginModal({ open, onOpenChange, onSwitchToRegister }: LoginModa
                   placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
                   className="pl-12 h-12 border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl transition-all duration-200"
                   required
                 />
@@ -186,6 +187,7 @@ export function LoginModal({ open, onOpenChange, onSwitchToRegister }: LoginModa
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
                   className="pl-12 pr-12 h-12 border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl transition-all duration-200"
                   required
                 />

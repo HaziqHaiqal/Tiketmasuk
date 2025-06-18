@@ -359,6 +359,7 @@ function DetailsContent() {
                       value={formData.buyerFullName}
                       onChange={(e) => setFormData(prev => ({ ...prev, buyerFullName: e.target.value }))}
                       placeholder="Your full name"
+                      autoComplete="name"
                       className={errors.buyerFullName ? "border-red-500" : ""}
                     />
                     {errors.buyerFullName && <p className="text-red-500 text-sm">{errors.buyerFullName}</p>}
@@ -372,6 +373,7 @@ function DetailsContent() {
                       value={formData.buyerEmail}
                       onChange={(e) => setFormData(prev => ({ ...prev, buyerEmail: e.target.value }))}
                       placeholder="your.email@example.com"
+                      autoComplete="email"
                       className={errors.buyerEmail ? "border-red-500" : ""}
                     />
                     {errors.buyerEmail && <p className="text-red-500 text-sm">{errors.buyerEmail}</p>}
@@ -393,6 +395,7 @@ function DetailsContent() {
                       setFormData(prev => ({ ...prev, buyerPhone: value }));
                     }}
                       placeholder="123456789"
+                      autoComplete="tel"
                       className={`pl-12 ${errors.buyerPhone ? "border-red-500" : ""}`}
                   />
                   </div>
@@ -423,6 +426,7 @@ function DetailsContent() {
                         value={holder.fullName}
                         onChange={(e) => updateTicketHolder(index, 'fullName', e.target.value)}
                         placeholder="Full name as per IC/Passport"
+                        autoComplete="name"
                         className={errors[`holder_${index}_name`] ? "border-red-500" : ""}
                       />
                       {errors[`holder_${index}_name`] && <p className="text-red-500 text-sm">{errors[`holder_${index}_name`]}</p>}
@@ -436,6 +440,7 @@ function DetailsContent() {
                         value={holder.email}
                         onChange={(e) => updateTicketHolder(index, 'email', e.target.value)}
                         placeholder="email@example.com"
+                        autoComplete="email"
                         className={errors[`holder_${index}_email`] ? "border-red-500" : ""}
                       />
                       {errors[`holder_${index}_email`] && <p className="text-red-500 text-sm">{errors[`holder_${index}_email`]}</p>}
@@ -456,6 +461,7 @@ function DetailsContent() {
                           updateTicketHolder(index, 'phone', value);
                         }}
                           placeholder="123456789"
+                          autoComplete="tel"
                           className={`pl-12 ${errors[`holder_${index}_phone`] ? "border-red-500" : ""}`}
                       />
                       </div>
@@ -470,6 +476,7 @@ function DetailsContent() {
                         value={holder.icPassport}
                         onChange={(e) => updateTicketHolder(index, 'icPassport', e.target.value)}
                         placeholder="IC or Passport number"
+                        autoComplete="off"
                         className={errors[`holder_${index}_ic`] ? "border-red-500" : ""}
                       />
                       {errors[`holder_${index}_ic`] && <p className="text-red-500 text-sm">{errors[`holder_${index}_ic`]}</p>}
