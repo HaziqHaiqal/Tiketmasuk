@@ -222,123 +222,138 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
 
         {/* Form content */}
         <div className="p-8 space-y-6">
-          {/* Account Type Selection - Prominent Section */}
-          <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-6 border border-gray-200">
-            <Label className="text-base font-bold text-gray-900 block mb-4">Choose your journey:</Label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => setAccountType("customer")}
-                className={`p-5 border-2 rounded-xl text-left transition-all duration-200 ${
-                  accountType === "customer"
-                    ? "border-blue-500 bg-blue-500 text-white shadow-lg scale-105"
-                    : "border-gray-200 hover:border-blue-300 bg-white hover:shadow-md"
-                }`}
-              >
-                <div className="text-2xl mb-2">🎫</div>
-                <div className="font-bold text-lg">Buy Tickets</div>
-                <div className={`text-sm mt-1 ${accountType === "customer" ? "text-blue-100" : "text-gray-600"}`}>
-                  Discover amazing events
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setAccountType("organizer")}
-                className={`p-5 border-2 rounded-xl text-left transition-all duration-200 ${
-                  accountType === "organizer"
-                    ? "border-purple-500 bg-purple-500 text-white shadow-lg scale-105"
-                    : "border-gray-200 hover:border-purple-300 bg-white hover:shadow-md"
-                }`}
-              >
-                <div className="text-2xl mb-2">🏪</div>
-                <div className="font-bold text-lg">Sell Tickets</div>
-                <div className={`text-sm mt-1 ${accountType === "organizer" ? "text-purple-100" : "text-gray-600"}`}>
-                  Create and manage events
-                </div>
-              </button>
+          {/* Account Type Selection - Tab Style */}
+          <div className="space-y-4">
+            <Label className="text-lg font-semibold text-gray-900 block text-center">Select Account Type</Label>
+            <div className="border-b border-gray-200">
+              <nav className="-mb-px flex w-full" aria-label="Tabs">
+                <button
+                  type="button"
+                  onClick={() => setAccountType("customer")}
+                  className={`flex-1 py-4 px-4 border-b-2 font-medium text-base transition-all duration-200 ${
+                    accountType === "customer"
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-center space-x-2">
+                    <span className="text-lg">🎫</span>
+                    <span className="font-semibold">Customer</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAccountType("organizer")}
+                  className={`flex-1 py-4 px-4 border-b-2 font-medium text-base transition-all duration-200 ${
+                    accountType === "organizer"
+                      ? "border-purple-500 text-purple-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-center space-x-2">
+                    <span className="text-lg">🏪</span>
+                    <span className="font-semibold">Organizer</span>
+                  </div>
+                </button>
+              </nav>
             </div>
-          </div>
-
-          {/* Social Sign Up */}
-          <div className="grid grid-cols-2 gap-3">
-            <Button
-              variant="outline"
-              className="h-12 border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition-all duration-200"
-              onClick={handleGoogleSignUp}
-              disabled={isLoading}
-            >
-              <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
-              </svg>
-              <span className="hidden sm:inline">Google</span>
-              <span className="sm:hidden">Google</span>
-            </Button>
             
-            <Button
-              variant="outline"
-              className="h-12 border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 font-medium rounded-xl transition-all duration-200"
-              onClick={handleFacebookSignUp}
-              disabled={isLoading}
-            >
-              <svg className="w-5 h-5 mr-2" fill="#1877F2" viewBox="0 0 24 24">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-              </svg>
-              <span className="hidden sm:inline">Facebook</span>
-              <span className="sm:hidden">Facebook</span>
-            </Button>
-          </div>
-
-          {/* Divider */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <Separator className="w-full border-gray-200" />
-            </div>
-            <div className="relative flex justify-center text-sm uppercase">
-              <span className="bg-white px-4 text-gray-500 font-medium">Or continue with email</span>
+            {/* Tab Content */}
+            <div className="pt-4">
+              {accountType === "customer" ? (
+                <div className="text-center">
+                  <div className="text-blue-600 font-semibold mb-1">Customer Account</div>
+                  <div className="text-gray-600 text-sm">Perfect for discovering and attending amazing events in your area</div>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <div className="text-purple-600 font-semibold mb-1">Organizer Account</div>
+                  <div className="text-gray-600 text-sm">Ideal for creating, managing, and promoting your own events</div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Email Sign Up Form - Single Column Layout */}
-          <form onSubmit={handleEmailSignUp} className="space-y-4">
-            {/* Basic Fields - Single Column */}
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm font-semibold text-gray-700">
-                {accountType === "organizer" ? "Display Name" : "Full Name"}
-              </Label>
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder={accountType === "organizer" ? "Enter display name" : "Enter your full name"}
-                  value={accountType === "organizer" ? displayName : name}
-                  onChange={(e) => {
-                    if (accountType === "organizer") {
-                      setDisplayName(e.target.value);
-                    } else {
-                      setName(e.target.value);
-                    }
-                  }}
-                  className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
-                  required
-                />
+          {/* Social Sign Up - Only for Customers */}
+          {accountType === "customer" && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  variant="outline"
+                  className="h-12 border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition-all duration-200"
+                  onClick={handleGoogleSignUp}
+                  disabled={isLoading}
+                >
+                  <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                    />
+                  </svg>
+                  <span className="hidden sm:inline">Google</span>
+                  <span className="sm:hidden">Google</span>
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  className="h-12 border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 font-medium rounded-xl transition-all duration-200"
+                  onClick={handleFacebookSignUp}
+                  disabled={isLoading}
+                >
+                  <svg className="w-5 h-5 mr-2" fill="#1877F2" viewBox="0 0 24 24">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                  <span className="hidden sm:inline">Facebook</span>
+                  <span className="sm:hidden">Facebook</span>
+                </Button>
               </div>
-            </div>
+
+              {/* Divider */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <Separator className="w-full border-gray-200" />
+                </div>
+                <div className="relative flex justify-center text-sm uppercase">
+                  <span className="bg-white px-4 text-gray-500 font-medium">Or continue with email</span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Email Sign Up Form */}
+          <form onSubmit={handleEmailSignUp} className="space-y-4">
+            {/* Customer Name Field - Only for customers */}
+            {accountType === "customer" && (
+              <div className="space-y-2">
+                <Label htmlFor="customerName" className="text-sm font-semibold text-gray-700">
+                  Full Name
+                </Label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Input
+                    id="customerName"
+                    type="text"
+                    placeholder="Enter your full name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
+                    required
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-semibold text-gray-700">
@@ -357,90 +372,6 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                 />
               </div>
             </div>
-
-            {/* Organizer-specific fields - Single Column */}
-            {accountType === "organizer" && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="fullName" className="text-sm font-semibold text-gray-700">
-                    Full Name
-                  </Label>
-                  <div className="relative">
-                    <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <Input
-                      id="fullName"
-                      type="text"
-                      placeholder="Enter your full legal name"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="storeName" className="text-sm font-semibold text-gray-700">
-                    Event Store Name
-                  </Label>
-                  <div className="relative">
-                    <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                    <Input
-                      id="storeName"
-                      type="text"
-                      placeholder="Your event brand/store name"
-                      value={storeName}
-                      onChange={(e) => setStoreName(e.target.value)}
-                      className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="primaryLocation" className="text-sm font-semibold text-gray-700">
-                    Primary Location
-                  </Label>
-                  <div className="relative">
-                    <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <Input
-                      id="primaryLocation"
-                      type="text"
-                      placeholder="City, State/Province, Country"
-                      value={primaryLocation}
-                      onChange={(e) => setPrimaryLocation(e.target.value)}
-                      className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone" className="text-sm font-semibold text-gray-700">
-                    Phone Number
-                  </Label>
-                  <div className="relative">
-                    <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="Your contact number"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
-                      required
-                    />
-                  </div>
-                </div>
-              </>
-            )}
 
             {/* Password Fields - Single Column */}
             <div className="space-y-2">
@@ -517,8 +448,127 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                 </div>
               </div>
             )}
+          </form>
 
-            {/* Terms and Conditions */}
+          {/* Additional Details Section - Only for Organizers */}
+          {accountType === "organizer" && (
+            <div className="space-y-4">
+              <div className="border-t border-gray-200 pt-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2 text-center">
+                  Business Details
+                </h3>
+                <p className="text-sm text-gray-600 text-center mb-6">
+                  Complete your business profile to start creating events
+                </p>
+                
+                <div className="space-y-4">
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="displayName" className="text-sm font-semibold text-gray-700">
+                        Display Name
+                      </Label>
+                      <div className="relative">
+                        <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <Input
+                          id="displayName"
+                          type="text"
+                          placeholder="e.g., ABC Corp, XYZ Foundation"
+                          value={displayName}
+                          onChange={(e) => setDisplayName(e.target.value)}
+                          className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="organizationName" className="text-sm font-semibold text-gray-700">
+                        Organization Name
+                      </Label>
+                      <div className="relative">
+                        <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        <Input
+                          id="organizationName"
+                          type="text"
+                          placeholder="e.g., ABC Development Corporation"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="storeName" className="text-sm font-semibold text-gray-700">
+                        Store Name
+                      </Label>
+                      <div className="relative">
+                        <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        <Input
+                          id="storeName"
+                          type="text"
+                          placeholder="e.g., ABC Store, Premium Hub"
+                          value={storeName}
+                          onChange={(e) => setStoreName(e.target.value)}
+                          className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="primaryLocation" className="text-sm font-semibold text-gray-700">
+                        Primary Location
+                      </Label>
+                      <div className="relative">
+                        <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4-4a1 1 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <Input
+                          id="primaryLocation"
+                          type="text"
+                          placeholder="City, State/Province, Country"
+                          value={primaryLocation}
+                          onChange={(e) => setPrimaryLocation(e.target.value)}
+                          className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="text-sm font-semibold text-gray-700">
+                        Phone Number
+                      </Label>
+                      <div className="relative">
+                        <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          placeholder="Your contact number"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Terms and Conditions */}
+          <div className="space-y-4">
             <div className="flex items-start space-x-2">
               <Checkbox
                 id="terms"
@@ -561,7 +611,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                 </div>
               )}
             </Button>
-          </form>
+          </div>
 
           {/* Switch to Login */}
           <div className="text-center pt-4 border-t border-gray-100">
