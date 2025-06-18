@@ -20,6 +20,8 @@ export default function SearchBar() {
       <form onSubmit={handleSearch} className="relative">
         <input
           type="text"
+          id="search-events"
+          name="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search for events..."

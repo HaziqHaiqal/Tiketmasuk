@@ -886,6 +886,8 @@ export default function EventForm({ mode, initialData, onSuccess }: EventFormPro
                           <label className="cursor-pointer">
                             <input
                               type="file"
+                              id="event-image-upload"
+                              name="eventImage"
                               accept="image/*"
                               onChange={handleImageChange}
                               className="hidden"

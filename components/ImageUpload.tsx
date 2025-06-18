@@ -188,6 +188,8 @@ export default function ImageUpload({
       <input
         ref={fileInputRef}
         type="file"
+        id={`image-upload-${label.toLowerCase().replace(/\s+/g, '-')}`}
+        name="imageUpload"
         accept={accept}
         onChange={handleFileInputChange}
         className="hidden"
