@@ -9,16 +9,18 @@ import { useParams } from "next/navigation";
 import Spinner from "@/components/Spinner";
 import JoinQueue from "@/components/JoinQueue";
 import { useConvexAuth } from "convex/react";
-import Link from "next/link";
 import { useStorageUrl } from "@/lib/utils";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AuthModalManager, type AuthModalType } from "@/components/auth/AuthModalManager";
+import { useState } from "react";
 
 export default function EventPage() {
   const { isAuthenticated } = useConvexAuth();
   const params = useParams();
+  const [authModal, setAuthModal] = useState<AuthModalType>(null);
   
   const event = useQuery(api.events.getById, {
     event_id: params.id as Id<"events">,
@@ -282,11 +284,12 @@ export default function EventPage() {
                       userId="" // Will be handled by the backend using ctx.auth
                     />
                   ) : (
-                    <Link href="/auth/login">
-                      <Button className="w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg">
-                        Sign in to buy tickets
-                      </Button>
-                    </Link>
+                    <Button 
+                      onClick={() => setAuthModal("login")}
+                      className="w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                    >
+                      Sign in to buy tickets
+                    </Button>
                   )}
                 </div>
               </div>
@@ -294,6 +297,9 @@ export default function EventPage() {
           </div>
         </div>
       </div>
+
+      {/* Auth Modal */}
+      <AuthModalManager open={authModal} onOpenChange={setAuthModal} />
     </div>
   );
 }
