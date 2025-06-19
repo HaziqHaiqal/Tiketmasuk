@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Ban } from "lucide-react";
-import { refundEventTickets } from "@/app/actions/refundEventTickets";
 import { Id } from "@/convex/_generated/dataModel";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
@@ -17,12 +16,12 @@ export default function CancelEventButton({
   const [isCancelling, setIsCancelling] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
-  const cancelEvent = useMutation(api.events.cancelEvent);
+  const cancelEvent = useMutation(api.events.cancel);
 
   const handleCancel = async () => {
     if (
       !confirm(
-        "Are you sure you want to cancel this event? All tickets will be refunded and the event will be cancelled permanently."
+        "Are you sure you want to cancel this event? This action cannot be undone."
       )
     ) {
       return;
@@ -30,13 +29,15 @@ export default function CancelEventButton({
 
     setIsCancelling(true);
     try {
-      await refundEventTickets(eventId);
-      await cancelEvent({ event_id: eventId });
+      // Cancel the event
+      await cancelEvent({ 
+        event_id: eventId
+      });
       toast({
         title: "Event cancelled",
-        description: "All tickets have been refunded successfully.",
+        description: "The event has been cancelled successfully.",
       });
-      router.push("/organiser/events");
+      router.push("/dashboard/organizer/events");
     } catch (error) {
       console.error("Failed to cancel event:", error);
       toast({

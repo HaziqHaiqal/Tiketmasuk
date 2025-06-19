@@ -50,8 +50,8 @@ export default function OrganizerProfileImages({
       setIsUploading(true);
       
       await deleteOrganizerImage({
-        organizerId,
-        imageType: type,
+        profile_id: organizerId,
+        image_type: type === "profileImage" ? "logo" : type === "storeLogo" ? "logo" : "banner",
       });
 
       setSelectedFiles(prev => ({
@@ -120,8 +120,9 @@ export default function OrganizerProfileImages({
 
       if (Object.keys(imageUpdates).length > 0) {
         await updateOrganizerImages({
-          organizerId,
-          images: imageUpdates,
+          profile_id: organizerId,
+          logo_storage_id: (imageUpdates.storeLogo || imageUpdates.profileImage) as Id<"_storage">,
+          banner_storage_id: imageUpdates.storeBanner as Id<"_storage">,
         });
 
         toast({

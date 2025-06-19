@@ -1,4 +1,4 @@
-import { getConvexClient } from "@/lib/convex";
+import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import { NextRequest } from "next/server";
 
@@ -30,29 +30,32 @@ export async function POST(req: NextRequest) {
       return new Response("Missing required parameters", { status: 400 });
     }
 
-    const convex = getConvexClient();
+    const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
     // Handle different payment statuses
     if (statusId === "1") {
-      // Status 1: Successful payment - update payment and booking status
+      // Status 1: Successful payment - update booking payment status
       try {
-        // Find payment by transaction reference (billCode is used as transaction reference)
-        const payment = await convex.query(api.payments.getPaymentByTransactionReference, {
-          transaction_reference: billCode
+        // Find booking by transaction reference (use billCode as booking number or payment reference)
+        const booking = await convex.query(api.bookings.getByPaymentReference, {
+          payment_reference: billCode
         });
 
-        if (payment) {
-          await convex.mutation(api.payments.updatePaymentStatus, {
-            payment_id: payment._id,
-            status: "completed",
-            transaction_reference: transactionId || orderId || billCode,
-            payment_response: JSON.stringify({
-              billcode: billCode,
-              status_id: statusId,
-              order_id: orderId,
-              msg: msg,
-              transaction_id: transactionId
-            })
+        if (booking) {
+          await convex.mutation(api.bookings.updatePaymentStatus, {
+            booking_id: booking._id,
+            payment_status: "paid",
+            payment_details: {
+              transaction_id: transactionId || orderId || billCode,
+              payment_method: "toyyibpay",
+              payment_response: JSON.stringify({
+                billcode: billCode,
+                status_id: statusId,
+                order_id: orderId,
+                msg: msg,
+                transaction_id: transactionId
+              })
+            }
           });
         }
       } catch (error) {
@@ -62,22 +65,25 @@ export async function POST(req: NextRequest) {
     } else {
       // Status 0, 2, 3: Failed, cancelled, or other unsuccessful statuses
       try {
-        // Find payment by transaction reference (billCode is used as transaction reference)
-        const payment = await convex.query(api.payments.getPaymentByTransactionReference, {
-          transaction_reference: billCode
+        // Find booking by transaction reference (use billCode as booking number or payment reference)
+        const booking = await convex.query(api.bookings.getByPaymentReference, {
+          payment_reference: billCode
         });
 
-        if (payment) {
-          await convex.mutation(api.payments.updatePaymentStatus, {
-            payment_id: payment._id,
-            status: "failed",
-            payment_response: JSON.stringify({
-              billcode: billCode,
-              status_id: statusId,
-              order_id: orderId,
-              msg: msg,
-              transaction_id: transactionId
-            })
+        if (booking) {
+          await convex.mutation(api.bookings.updatePaymentStatus, {
+            booking_id: booking._id,
+            payment_status: "failed",
+            payment_details: {
+              payment_method: "toyyibpay",
+              payment_response: JSON.stringify({
+                billcode: billCode,
+                status_id: statusId,
+                order_id: orderId,
+                msg: msg,
+                transaction_id: transactionId
+              })
+            }
           });
         }
       } catch (error) {

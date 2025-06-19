@@ -1,524 +1,179 @@
-import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
-import { Id } from "./_generated/dataModel";
-import { DURATIONS } from "./constants";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { QueryCtx, MutationCtx } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
+import { QueryCtx, MutationCtx } from "./_generated/server";
+import { DURATIONS } from "./constants";
+import { ConvexError } from "convex/values";
+import { WAITING_LIST_STATUS } from "./constants";
 
-/**
- * Helper function to group waiting list entries by event ID.
- * Used for batch processing expired offers by event.
- */
-function groupByEvent(
-  offers: Array<{ event_id: Id<"events">; _id: Id<"waiting_list"> }>
-) {
-  return offers.reduce(
-    (acc, offer) => {
-      const event_id = offer.event_id;
-      if (!acc[event_id]) {
-        acc[event_id] = [];
-      }
-      acc[event_id].push(offer);
-      return acc;
-    },
-    {} as Record<Id<"events">, typeof offers>
-  );
-}
+// =============================================================================
+// QUEUE MANAGEMENT & WAITING LIST SYSTEM
+// =============================================================================
 
-/**
- * Query to get a waiting list entry by ID.
- */
-export const getById = query({
-  args: {
-    id: v.id("waiting_list"),
-  },
-  handler: async (ctx, { id }) => {
-    return await ctx.db.get(id);
-  },
-});
-
-/**
- * Query to get a user's current position in the waiting list for an event.
- * Returns null if user is not in queue, otherwise returns their entry with position.
- */
-export const getQueuePosition = query({
+// Join waiting list for a specific ticket category
+export const joinQueue = mutation({
   args: {
     event_id: v.id("events"),
-    user_id: v.string(),
+    ticket_category_id: v.id("ticket_categories"),
+    requested_quantity: v.number(),
+    email: v.string(),
+    phone: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db
-      .query("waiting_list")
-      .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
-      .filter((q) => q.eq(q.field("user_id"), args.user_id))
-      .first();
-  },
-});
-
-/**
- * Mutation to process the waiting list queue and offer tickets to next eligible users.
- * Checks current availability considering purchased tickets and active offers.
- */
-export const processQueue = internalMutation({
-  args: {
-    event_id: v.id("events"),
-  },
-  handler: async (ctx, args) => {
-    const event = await ctx.db.get(args.event_id);
-    if (!event) return;
-
-    // Get next person in queue
-    const nextInQueue = await ctx.db
-      .query("waiting_list")
-      .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
-      .filter((q) => q.eq(q.field("status"), "waiting"))
-      .order("asc")
-      .first();
-
-    if (!nextInQueue) return;
-
-    // Update status to offered
-    await ctx.db.patch(nextInQueue._id, {
-      status: "offered",
-      offer_expires_at: Date.now() + DURATIONS.OFFER_EXPIRY,
-      updated_at: Date.now(),
-    });
-
-    // Schedule expiry
-    await ctx.scheduler.runAfter(
-      DURATIONS.OFFER_EXPIRY,
-      internal.waitingList.expireOffer,
-      {
-        waiting_list_id: nextInQueue._id,
-        event_id: args.event_id,
-      }
-    );
-  },
-});
-
-/**
- * Internal mutation to expire a single offer and process queue for next person.
- * Called by scheduled job when offer timer expires.
- */
-export const expireOffer = internalMutation({
-  args: {
-    waiting_list_id: v.id("waiting_list"),
-    event_id: v.id("events"),
-  },
-  handler: async (ctx, args) => {
-    const entry = await ctx.db.get(args.waiting_list_id);
-    if (!entry || entry.status !== "offered") return;
-
-    await ctx.db.patch(args.waiting_list_id, {
-      status: "expired",
-      updated_at: Date.now(),
-    });
-
-    await ctx.scheduler.runAfter(0, internal.waitingList.cleanupExpiredOffers, {});
-  },
-});
-
-/**
- * Periodic cleanup job that acts as a fail-safe for expired offers.
- * While individual offers should expire via scheduled jobs (expireOffer),
- * this ensures any offers that weren't properly expired (e.g. due to server issues)
- * are caught and cleaned up. Also helps maintain data consistency.
- *
- * Groups expired offers by event for efficient processing and updates queue
- * for each affected event after cleanup.
- */
-export const cleanupExpiredOffers = internalMutation({
-  handler: async (ctx) => {
-    const now = Date.now();
-    const expiredOffers = await ctx.db
-      .query("waiting_list")
-      .withIndex("by_status", (q) => q.eq("status", "offered"))
-      .filter((q) => q.lt(q.field("offer_expires_at"), now))
-      .collect();
-
-    const grouped = expiredOffers.reduce((acc: any, offer) => {
-      const event_id = offer.event_id;
-      if (!acc[event_id]) {
-        acc[event_id] = [];
-      }
-      acc[event_id].push(offer);
-      return acc;
-    }, {});
-
-    for (const entry of expiredOffers) {
-      await ctx.db.patch(entry._id, {
-        status: "expired",
-        updated_at: now,
-      });
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Must be authenticated to join queue");
     }
 
-    for (const [event_id, offers] of Object.entries(grouped)) {
-      await ctx.scheduler.runAfter(0, internal.waitingList.processQueue, {
-        event_id: event_id as any,
-      });
-    }
-  },
-});
-
-export const addToWaitingList = mutation({
-  args: {
-    event_id: v.id("events"),
-    user_id: v.string(),
-    category_id: v.string(),
-    quantity: v.number(), // Required quantity field
-  },
-  handler: async (ctx, args) => {
-    // Check if user already in waiting list for this category
-    const existing = await ctx.db
-      .query("waiting_list")
-      .withIndex("by_event_user", (q) => 
-        q.eq("event_id", args.event_id).eq("user_id", args.user_id)
-      )
-      .filter((q) => q.eq(q.field("category_id"), args.category_id))
-      .first();
-
-    if (existing) {
-      throw new Error("Already in waiting list for this category");
-    }
-
-    // Get current queue position for this category
-    const waitingCount = await ctx.db
-      .query("waiting_list")
-      .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
-      .filter((q) => q.eq(q.field("category_id"), args.category_id))
-      .filter((q) => q.eq(q.field("status"), "waiting"))
-      .collect();
-
-    return await ctx.db.insert("waiting_list", {
-      event_id: args.event_id,
-      user_id: args.user_id,
-      category_id: args.category_id,
-      quantity: args.quantity,
-      position: waitingCount.length + 1,
-      status: "waiting",
-      joined_at: Date.now(),
-    });
-  },
-});
-
-export const purchaseFromWaitingList = mutation({
-  args: {
-    event_id: v.id("events"),
-    waiting_list_id: v.id("waiting_list"),
-  },
-  handler: async (ctx, args) => {
-    const entry = await ctx.db.get(args.waiting_list_id);
-    if (!entry || entry.status !== "offered") {
-      throw new Error("Invalid waiting list entry");
-    }
-
-    await ctx.db.patch(args.waiting_list_id, {
-      status: "purchased",
-      updated_at: Date.now(),
-    });
-  },
-});
-
-export const joinWaitingList = mutation({
-  args: {
-    event_id: v.id("events"),
-    user_id: v.string(),
-    category_id: v.string(),
-    quantity: v.number(),
-    product_selections: v.optional(v.array(v.object({
-      product_id: v.id("products"),
-      quantity: v.number(),
-      selected_variants: v.array(v.object({
-        variant_id: v.string(),
-        option_id: v.string(),
-      })),
-    }))),
-  },
-  handler: async (ctx, args) => {
-    // Check if user is already in queue for this category
+    // Check if user already in queue for this ticket category
     const existingEntry = await ctx.db
       .query("waiting_list")
-      .withIndex("by_event_user", (q) => 
-        q.eq("event_id", args.event_id).eq("user_id", args.user_id)
+      .withIndex("by_user", (q) => q.eq("user_id", identity.subject as any))
+      .filter((q) => q.eq(q.field("event_id"), args.event_id))
+      .filter((q) => q.eq(q.field("ticket_category_id"), args.ticket_category_id))
+      .filter((q) => 
+        q.or(
+          q.eq(q.field("status"), "waiting"),
+          q.eq(q.field("status"), "offered")
+        )
       )
-      .filter((q) => q.eq(q.field("category_id"), args.category_id))
-      .filter((q) => q.eq(q.field("status"), "waiting"))
       .first();
 
     if (existingEntry) {
-      throw new Error("You are already in the waiting list for this category");
+      throw new Error("Already in queue for this ticket category");
     }
 
     // Calculate position in queue
-    const position = await calculateQueuePosition(ctx, {
-      event_id: args.event_id,
-      category_id: args.category_id,
-    });
+    const entries = await ctx.db
+      .query("waiting_list")
+      .withIndex("by_ticket_category", (q) => q.eq("ticket_category_id", args.ticket_category_id))
+      .filter((q) => q.eq(q.field("status"), "waiting"))
+      .collect();
 
-    return await ctx.db.insert("waiting_list", {
+    const position = entries.length + 1;
+
+    // Add to waiting list
+    const waitingListId = await ctx.db.insert("waiting_list", {
       event_id: args.event_id,
-      user_id: args.user_id,
-      category_id: args.category_id,
-      quantity: args.quantity,
+      user_id: identity.subject as any,
+      ticket_category_id: args.ticket_category_id,
+      position: position,
+      requested_quantity: args.requested_quantity,
+      email: args.email,
+      phone: args.phone,
       status: "waiting",
-      position: position + 1,
-      joined_at: Date.now(),
-      product_selections: args.product_selections,
+      created_at: Date.now(),
     });
-  },
-});
-
-export const releaseTicket = mutation({
-  args: {
-    event_id: v.id("events"),
-    waiting_list_id: v.id("waiting_list"),
-  },
-  handler: async (ctx, args) => {
-    const waitingListEntry = await ctx.db.get(args.waiting_list_id);
-    if (!waitingListEntry) {
-      throw new Error("Waiting list entry not found");
-    }
-
-    // Update status to expired
-    await ctx.db.patch(args.waiting_list_id, {
-      status: "expired",
-      updated_at: Date.now(),
-    });
-
-    return { success: true };
-  },
-});
-
-export const joinMultipleCategoriesQueue = mutation({
-  args: {
-    event_id: v.id("events"),
-    user_id: v.string(),
-    categories: v.array(v.object({
-      category_id: v.string(),
-      quantity: v.number(),
-      product_selections: v.optional(v.array(v.object({
-        product_id: v.id("products"),
-        quantity: v.number(),
-        selected_variants: v.array(v.object({
-          variant_id: v.string(),
-          option_id: v.string(),
-        })),
-      }))),
-    })),
-  },
-  handler: async (ctx, args) => {
-    const event = await ctx.db.get(args.event_id);
-    if (!event) {
-      throw new Error("Event not found");
-    }
-
-    // Validate all categories first (fail-fast approach)
-    for (const categoryRequest of args.categories) {
-      const category = event.categories.find(cat => cat.id === categoryRequest.category_id);
-      if (!category) {
-        throw new Error(`Category ${categoryRequest.category_id} not found`);
-      }
-
-      // Check if user is already in queue for this category
-      const existingEntry = await ctx.db
-        .query("waiting_list")
-        .withIndex("by_event_user", (q) => 
-          q.eq("event_id", args.event_id).eq("user_id", args.user_id)
-        )
-        .filter((q) => q.eq(q.field("category_id"), categoryRequest.category_id))
-        .filter((q) => q.eq(q.field("status"), "waiting"))
-        .first();
-
-      if (existingEntry) {
-        throw new Error(`You are already in the waiting list for category: ${category.name}`);
-      }
-    }
-
-    // Create queue entries for each category
-    const queueEntries = [];
-    for (const categoryRequest of args.categories) {
-      const position = await calculateQueuePosition(ctx, {
-        event_id: args.event_id,
-        category_id: categoryRequest.category_id,
-      });
-
-      const entryId = await ctx.db.insert("waiting_list", {
-        event_id: args.event_id,
-        user_id: args.user_id,
-        category_id: categoryRequest.category_id,
-        quantity: categoryRequest.quantity,
-        status: "waiting",
-        position: position + 1,
-        joined_at: Date.now(),
-        product_selections: categoryRequest.product_selections,
-      });
-
-      queueEntries.push(entryId);
-    }
-
-    return queueEntries;
-  },
-});
-
-// Get user's queue status for multiple categories
-export const getUserQueueStatus = query({
-  args: {
-    event_id: v.id("events"),
-    user_id: v.string(),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("waiting_list")
-      .withIndex("by_event_user", (q) => 
-        q.eq("event_id", args.event_id).eq("user_id", args.user_id)
-      )
-      .filter((q) => q.eq(q.field("status"), "waiting"))
-      .collect();
-  },
-});
-
-// Helper function to calculate queue position
-async function calculateQueuePosition(
-  ctx: QueryCtx | MutationCtx,
-  args: { event_id: string; category_id: string }
-) {
-  // Get all waiting entries for this category
-  const waitingEntries = await ctx.db
-    .query("waiting_list")
-    .withIndex("by_event", (q: any) => q.eq("event_id", args.event_id))
-    .filter((q: any) => q.eq(q.field("category_id"), args.category_id))
-    .filter((q: any) => q.eq(q.field("status"), "waiting"))
-    .collect();
-
-  // Calculate total tickets ahead in queue
-  let totalTicketsAhead = 0;
-  for (const entry of waitingEntries) {
-    totalTicketsAhead += entry.quantity;
-  }
-
-  return totalTicketsAhead;
-}
-
-// Helper function to recalculate queue positions
-async function recalculateQueuePositions(
-  ctx: MutationCtx,
-  args: { event_id: string; category_id: string }
-) {
-  const waitingEntries = await ctx.db
-    .query("waiting_list")
-    .withIndex("by_event", (q: any) => q.eq("event_id", args.event_id))
-    .filter((q: any) => q.eq(q.field("category_id"), args.category_id))
-    .filter((q: any) => q.eq(q.field("status"), "waiting"))
-    .order("asc")
-    .collect();
-
-  // Sort by joined_at to maintain FIFO order
-  waitingEntries.sort((a: any, b: any) => a.joined_at - b.joined_at);
-
-  let currentPosition = 1;
-  for (const entry of waitingEntries) {
-    await ctx.db.patch(entry._id, {
-      position: currentPosition,
-      updated_at: Date.now(),
-    });
-    currentPosition += entry.quantity;
-  }
-}
-
-// Check availability for a category considering queue
-export const checkCategoryAvailability = query({
-  args: {
-    event_id: v.id("events"),
-    category_id: v.string(),
-    requested_quantity: v.number(),
-  },
-  handler: async (ctx, args) => {
-    const event = await ctx.db.get(args.event_id);
-    if (!event) return null;
-
-    const category = event.categories.find(cat => cat.id === args.category_id);
-    if (!category) return null;
-
-    // Count tickets sold from completed bookings
-    const bookings = await ctx.db
-      .query("bookings")
-      .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
-      .filter((q) => q.eq(q.field("status"), "completed"))
-      .collect();
-
-    let ticketsSold = 0;
-    for (const booking of bookings) {
-      for (const detail of booking.booking_details) {
-        if (detail.category_id === args.category_id) {
-          ticketsSold += detail.quantity;
-        }
-      }
-    }
-
-    // Count tickets in queue
-    const queueEntries = await ctx.db
-      .query("waiting_list")
-      .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
-      .filter((q) => q.eq(q.field("category_id"), args.category_id))
-      .filter((q) => q.eq(q.field("status"), "waiting"))
-      .collect();
-
-    let ticketsInQueue = 0;
-    for (const entry of queueEntries) {
-      ticketsInQueue += entry.quantity;
-    }
-
-    const totalCommitted = ticketsSold + ticketsInQueue;
-    const availableForPurchase = category.total_tickets - totalCommitted;
-    const canPurchaseDirectly = availableForPurchase >= args.requested_quantity;
 
     return {
-      total_tickets: category.total_tickets,
-      tickets_sold: ticketsSold,
-      tickets_in_queue: ticketsInQueue,
-      available_for_purchase: availableForPurchase,
-      can_purchase_directly: canPurchaseDirectly,
-      queue_position: canPurchaseDirectly ? 0 : await calculateQueuePosition(ctx, args) + 1,
+      waiting_list_id: waitingListId,
+      position: position,
+      message: "Successfully joined the queue",
     };
   },
 });
 
-// Process queue when tickets become available
-export const processQueueForCategory = mutation({
+// Get user's position in queue
+export const getQueuePosition = query({
   args: {
     event_id: v.id("events"),
-    category_id: v.string(),
+    ticket_category_id: v.id("ticket_categories"),
   },
   handler: async (ctx, args) => {
-    const event = await ctx.db.get(args.event_id);
-    if (!event) return { processed: 0 };
-
-    const category = event.categories.find(cat => cat.id === args.category_id);
-    if (!category) return { processed: 0 };
-
-    // Count tickets sold from completed bookings
-    const bookings = await ctx.db
-      .query("bookings")
-      .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
-      .filter((q) => q.eq(q.field("status"), "completed"))
-      .collect();
-
-    let ticketsSold = 0;
-    for (const booking of bookings) {
-      for (const detail of booking.booking_details) {
-        if (detail.category_id === args.category_id) {
-          ticketsSold += detail.quantity;
-        }
-      }
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return null;
     }
 
-    const availableTickets = category.total_tickets - ticketsSold;
+    const entry = await ctx.db
+      .query("waiting_list")
+      .withIndex("by_user", (q) => q.eq("user_id", identity.subject as any))
+      .filter((q) => q.eq(q.field("event_id"), args.event_id))
+      .filter((q) => q.eq(q.field("ticket_category_id"), args.ticket_category_id))
+      .filter((q) => 
+        q.or(
+          q.eq(q.field("status"), "waiting"),
+          q.eq(q.field("status"), "offered")
+        )
+      )
+      .first();
 
-    // Get queue entries in order
+    if (!entry) {
+      return null;
+    }
+
+    return {
+      position: entry.position,
+      status: entry.status,
+      requested_quantity: entry.requested_quantity,
+      created_at: entry.created_at,
+      offer_expires_at: entry.offer_expires_at,
+    };
+  },
+});
+
+// Get specific queue entry for user, event, and ticket category
+export const getUserQueueEntry = query({
+  args: {
+    event_id: v.id("events"),
+    ticket_category_id: v.id("ticket_categories"),
+    user_id: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const entry = await ctx.db
+      .query("waiting_list")
+      .withIndex("by_user", (q) => q.eq("user_id", args.user_id))
+      .filter((q) => q.eq(q.field("event_id"), args.event_id))
+      .filter((q) => q.eq(q.field("ticket_category_id"), args.ticket_category_id))
+      .filter((q) => 
+        q.or(
+          q.eq(q.field("status"), "waiting"),
+          q.eq(q.field("status"), "offered"),
+          q.eq(q.field("status"), "purchasing")
+        )
+      )
+      .first();
+
+    return entry;
+  },
+});
+
+// Get all queue entries for user
+export const getUserQueueEntries = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return [];
+    }
+
+    const entries = await ctx.db
+      .query("waiting_list")
+      .withIndex("by_user", (q) => q.eq("user_id", identity.subject as any))
+      .filter((q) => 
+        q.or(
+          q.eq(q.field("status"), "waiting"),
+          q.eq(q.field("status"), "offered")
+        )
+      )
+      .collect();
+
+    return entries;
+  },
+});
+
+// Admin function to process queue when tickets become available
+export const processQueue = mutation({
+  args: {
+    ticket_category_id: v.id("ticket_categories"),
+    available_quantity: v.number(),
+  },
+  handler: async (ctx, args) => {
+    // Get queue entries for this ticket category in order
     const queueEntries = await ctx.db
       .query("waiting_list")
-      .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
-      .filter((q) => q.eq(q.field("category_id"), args.category_id))
+      .withIndex("by_ticket_category", (q) => q.eq("ticket_category_id", args.ticket_category_id))
       .filter((q) => q.eq(q.field("status"), "waiting"))
       .order("asc")
       .collect();
@@ -527,53 +182,120 @@ export const processQueueForCategory = mutation({
     queueEntries.sort((a, b) => a.position - b.position);
 
     let processed = 0;
-    let remainingTickets = availableTickets;
+    let remainingTickets = args.available_quantity;
 
     for (const entry of queueEntries) {
-      if (remainingTickets >= entry.quantity) {
+      if (remainingTickets >= entry.requested_quantity) {
         // Offer tickets to this user
         await ctx.db.patch(entry._id, {
           status: "offered",
-          offer_expires_at: Date.now() + (24 * 60 * 60 * 1000), // 24 hours
+          offered_at: Date.now(),
+          offer_expires_at: Date.now() + DURATIONS.OFFER_EXPIRY,
+          offered_quantity: entry.requested_quantity,
           updated_at: Date.now(),
         });
 
-        remainingTickets -= entry.quantity;
+        remainingTickets -= entry.requested_quantity;
         processed++;
       } else {
         break; // Not enough tickets for this entry
       }
     }
 
-    return { processed };
+    return { processed, remaining_tickets: remainingTickets };
   },
 });
 
-export const leaveWaitingList = mutation({
+// Accept queue offer and proceed to purchase
+export const acceptOffer = mutation({
   args: {
     waiting_list_id: v.id("waiting_list"),
   },
   handler: async (ctx, args) => {
     const entry = await ctx.db.get(args.waiting_list_id);
     if (!entry) {
-      throw new Error("Waiting list entry not found");
+      throw new Error("Queue entry not found");
     }
 
-    await ctx.db.patch(args.waiting_list_id, {
-      status: "cancelled",
-      updated_at: Date.now(),
-    });
+    if (entry.status !== "offered") {
+      throw new Error("No offer available");
+    }
 
-    // Recalculate positions for remaining entries
-    await recalculateQueuePositions(ctx, {
-      event_id: entry.event_id,
-      category_id: entry.category_id,
+    if (entry.offer_expires_at && entry.offer_expires_at < Date.now()) {
+      await ctx.db.patch(args.waiting_list_id, {
+        status: "expired",
+        updated_at: Date.now(),
+      });
+      throw new Error("Offer has expired");
+    }
+
+    // Mark as purchasing
+    await ctx.db.patch(args.waiting_list_id, {
+      status: "purchasing",
+      purchase_started_at: Date.now(),
+      purchase_timeout_at: Date.now() + (15 * 60 * 1000),
+      updated_at: Date.now(),
     });
 
     return { success: true };
   },
 });
 
+// Complete purchase from queue
+export const completePurchase = mutation({
+  args: {
+    waiting_list_id: v.id("waiting_list"),
+    booking_id: v.id("bookings"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.waiting_list_id, {
+      status: "converted",
+      purchase_session_id: args.booking_id,
+      updated_at: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+// Leave waiting list
+export const leaveWaitingList = mutation({
+  args: {
+    waiting_list_id: v.id("waiting_list"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.waiting_list_id, {
+      status: "cancelled",
+      updated_at: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+// Internal function to clean up expired offers
+export const cleanupExpiredOffers = internalMutation({
+  handler: async (ctx) => {
+    const now = Date.now();
+    
+    const expiredOffers = await ctx.db
+      .query("waiting_list")
+      .withIndex("by_expiry", (q) => q.lt("offer_expires_at", now))
+      .filter((q) => q.eq(q.field("status"), "offered"))
+      .collect();
+
+    for (const offer of expiredOffers) {
+      await ctx.db.patch(offer._id, {
+        status: "expired",
+        updated_at: now,
+      });
+    }
+
+    return { expired_count: expiredOffers.length };
+  },
+});
+
+// Admin queries
 export const getWaitingListByEvent = query({
   args: { event_id: v.id("events") },
   handler: async (ctx, args) => {
@@ -587,40 +309,117 @@ export const getWaitingListByEvent = query({
 });
 
 export const getWaitingListByCategory = query({
-  args: {
-    event_id: v.id("events"),
-    category_id: v.string(),
-  },
+  args: { event_id: v.id("events"), ticket_category_id: v.id("ticket_categories") },
   handler: async (ctx, args) => {
     return await ctx.db
       .query("waiting_list")
       .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
-      .filter((q) => q.eq(q.field("category_id"), args.category_id))
-      .filter((q) => q.eq(q.field("status"), "waiting"))
+      .filter((q) => q.eq(q.field("ticket_category_id"), args.ticket_category_id))
       .order("asc")
       .collect();
   },
 });
 
-export const updateWaitingListStatus = mutation({
-  args: {
-    waiting_list_id: v.id("waiting_list"),
-    status: v.union(
-      v.literal("waiting"),
-      v.literal("offered"),
-      v.literal("expired"),
-      v.literal("purchased"),
-      v.literal("cancelled")
-    ),
-    offer_expires_at: v.optional(v.number()),
-  },
+// Get waiting list entry by ID
+export const getWaitingListEntry = query({
+  args: { waiting_list_id: v.id("waiting_list") },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.waiting_list_id, {
-      status: args.status,
-      offer_expires_at: args.offer_expires_at,
-      updated_at: Date.now(),
-    });
-
     return await ctx.db.get(args.waiting_list_id);
   },
 });
+
+// ============================================================================
+// TICKET RELEASE FUNCTIONALITY
+// ============================================================================
+
+export const releaseTicket = mutation({
+  args: {
+    event_id: v.id("events"),
+    waiting_list_id: v.id("waiting_list"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError("Must be authenticated to release tickets");
+    }
+    
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("email"), identity.email!))
+      .first();
+    
+    if (!user) {
+      throw new ConvexError("User not found");
+    }
+    
+    const userId = user._id;
+    if (!userId) {
+      throw new ConvexError("Must be authenticated to release tickets");
+    }
+
+    // Get the waiting list entry
+    const waitingListEntry = await ctx.db.get(args.waiting_list_id);
+    if (!waitingListEntry) {
+      throw new ConvexError("Waiting list entry not found");
+    }
+
+    // Verify the user owns this waiting list entry
+    if (waitingListEntry.user_id !== userId) {
+      throw new ConvexError("Not authorized to release this ticket");
+    }
+
+    // Verify this is an offered ticket that can be released
+    if (waitingListEntry.status !== WAITING_LIST_STATUS.OFFERED) {
+      throw new ConvexError("Can only release offered tickets");
+    }
+
+    // Update the status to declined
+    await ctx.db.patch(args.waiting_list_id, {
+      status: WAITING_LIST_STATUS.DECLINED,
+      updated_at: Date.now(),
+    });
+
+    // Get the ticket category to increment available quantity
+    const ticketCategory = await ctx.db.get(waitingListEntry.ticket_category_id);
+    if (ticketCategory) {
+      // Decrease reserved quantity since this offer is being released
+      await ctx.db.patch(waitingListEntry.ticket_category_id, {
+        reserved_quantity: Math.max(0, (ticketCategory.reserved_quantity || 0) - waitingListEntry.requested_quantity),
+        updated_at: Date.now(),
+      });
+    }
+
+    // Find the next person in queue for this category
+    const nextInQueue = await ctx.db
+      .query("waiting_list")
+      .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
+      .filter((q) => q.eq(q.field("ticket_category_id"), waitingListEntry.ticket_category_id))
+      .filter((q) => q.eq(q.field("status"), WAITING_LIST_STATUS.WAITING))
+      .order("asc")
+      .first();
+
+    if (nextInQueue && ticketCategory) {
+      // Check if we have enough available tickets for the next person
+      const availableQuantity = ticketCategory.total_quantity - 
+        (ticketCategory.sold_quantity || 0) - 
+        (ticketCategory.reserved_quantity || 0);
+
+      if (availableQuantity >= nextInQueue.requested_quantity) {
+        // Offer tickets to the next person
+        await ctx.db.patch(nextInQueue._id, {
+          status: WAITING_LIST_STATUS.OFFERED,
+          offer_expires_at: Date.now() + (15 * 60 * 1000), // 15 minutes
+          updated_at: Date.now(),
+        });
+
+        // Reserve the tickets
+        await ctx.db.patch(waitingListEntry.ticket_category_id, {
+          reserved_quantity: (ticketCategory.reserved_quantity || 0) + nextInQueue.requested_quantity,
+          updated_at: Date.now(),
+        });
+      }
+    }
+
+    return await ctx.db.get(args.waiting_list_id);
+  },
+}); 

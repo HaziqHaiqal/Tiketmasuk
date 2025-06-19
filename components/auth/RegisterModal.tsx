@@ -260,7 +260,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
             
             {/* Tab Content */}
             <div className="pt-4">
-              {accountType === "customer" ? (
+                                            {accountType === "customer" ? (
                 <div className="text-center">
                   <div className="text-blue-600 font-semibold mb-1">Customer Account</div>
                   <div className="text-gray-600 text-sm">Perfect for discovering and attending amazing events in your area</div>
@@ -334,8 +334,8 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
 
           {/* Email Sign Up Form */}
           <form onSubmit={handleEmailSignUp} className="space-y-4">
-            {/* Customer Name Field - Only for customers */}
-            {accountType === "customer" && (
+                      {/* Customer Name Field - Only for customers */}
+          {accountType === "customer" && (
               <div className="space-y-2">
                 <Label htmlFor="customerName" className="text-sm font-semibold text-gray-700">
                   Full Name

@@ -1,514 +1,381 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useConvexAuth, useMutation } from "convex/react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useQuery } from "convex/react";
-import { Id } from "@/convex/_generated/dataModel";
-import {
-  Calendar,
-  MapPin,
-  Clock,
-  ArrowRight,
-  ArrowLeft,
-  User,
-  CreditCard,
-  Shield,
-  CheckCircle,
-  FileText,
-} from "lucide-react";
-import { useStorageUrl } from "@/lib/utils";
-import { clearCheckoutSessionData } from "@/lib/utils";
-import Image from "next/image";
-import Spinner from "@/components/Spinner";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getMinPrice } from "@/lib/eventUtils";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-interface TicketHolderData {
-  fullName: string;
-  email: string;
-  phone: string;
-  countryCode: string;
-  icPassport: string;
-  dateOfBirth: string;
-  gender: string;
-  country: string;
-  state: string;
-  address: string;
-  postcode: string;
-  ticketType: string;
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { AlertCircle, ArrowLeft, Check, CreditCard, MapPin, Package, Truck, User } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import CheckoutLayout from "@/components/checkout/CheckoutLayout";
+import { calculateFees } from "@/lib/utils";
+
+interface CheckoutData {
+  contactInfo: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+  };
+  billingAddress: any;
+  shippingAddress: any;
+  sameAsBilling: boolean;
+  shippingOption: string;
+  shippingCost: number;
+  cartItems: any[];
+  subtotal: number;
+  total: number;
 }
 
-interface PurchaseFormData {
-  buyerFullName: string;
-  buyerEmail: string;
-  buyerPhone: string;
-  buyerCountryCode: string;
-  ticketHolders: TicketHolderData[];
-  specialRequests: string;
-  marketingEmails: boolean;
-  eventUpdates: boolean;
-}
-
-function SummaryContent() {
+export default function CheckoutSummaryPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
-  
-  const eventId = searchParams.get("eventId") as Id<"events">;
-  const waitingListId = searchParams.get("waitingListId") as Id<"waiting_list">;
-  const userType = searchParams.get("userType");
-  
-  const [isLoading, setIsLoading] = useState(false);
-  const [acceptTerms, setAcceptTerms] = useState(false);
-  const [acceptPrivacy, setAcceptPrivacy] = useState(false);
-  const [formData, setFormData] = useState<PurchaseFormData | null>(null);
-  const [timeRemaining, setTimeRemaining] = useState("");
-
-  const event = useQuery(api.events.getById, { event_id: eventId });
-  const queuePosition = useQuery(
-    api.waitingList.getQueuePosition,
-    isAuthenticated ? {
-      event_id: eventId,
-      user_id: "", // Will be handled by the backend using ctx.auth
-    } : "skip"
-  );
-  
-  const imageUrl = useStorageUrl(event?.image_storage_id);
-
-  // Calculate offer validity
-  const hasValidOffer = queuePosition?.status === "offered";
-  const offerExpiresAt = queuePosition?.offer_expires_at ?? 0;
-  const isExpired = Date.now() > offerExpiresAt;
-
-  // Handle timer expiration
-  useEffect(() => {
-    if (hasValidOffer && isExpired) {
-      // Clear all session storage data when timer expires
-      clearCheckoutSessionData();
-      // Redirect to event page when timer expires
-      router.push(`/event/${eventId}`);
-    }
-  }, [hasValidOffer, isExpired, eventId, router]);
+  const createBooking = useMutation(api.bookings.createBooking);
+  const [checkoutData, setCheckoutData] = useState<CheckoutData | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!hasValidOffer || isExpired) return;
-
-    const calculateTimeRemaining = () => {
-      const diff = offerExpiresAt - Date.now();
-      if (diff <= 0) {
-        setTimeRemaining("Expired");
-        // Clear all session storage data when timer reaches zero
-        clearCheckoutSessionData();
-        // Redirect when timer reaches zero
-        router.push(`/event/${eventId}`);
-        return;
-      }
-
-      const minutes = Math.floor(diff / 1000 / 60);
-      const seconds = Math.floor((diff / 1000) % 60);
-
-      if (minutes > 0) {
-        setTimeRemaining(`${minutes}m ${seconds}s`);
-      } else {
-        setTimeRemaining(`${seconds}s`);
-      }
-    };
-
-    calculateTimeRemaining();
-    const interval = setInterval(calculateTimeRemaining, 1000);
-    return () => clearInterval(interval);
-  }, [offerExpiresAt, hasValidOffer, isExpired, eventId, router]);
-
-  // Load form data from session storage
-  useEffect(() => {
-    const storedData = sessionStorage.getItem('checkoutData');
-    if (storedData) {
+    // Load checkout data from localStorage
+    const savedData = localStorage.getItem("checkoutData");
+    if (savedData) {
       try {
-        const data = JSON.parse(storedData) as PurchaseFormData;
-        setFormData(data);
-      } catch {
-        // Redirect back to details if no data
-        router.push(`/checkout/details?eventId=${eventId}&waitingListId=${waitingListId}&userType=${userType}`);
+        setCheckoutData(JSON.parse(savedData));
+      } catch (err) {
+        setError("Invalid checkout data. Please start over.");
       }
     } else {
       // Redirect back to details if no data
-      router.push(`/checkout/details?eventId=${eventId}&waitingListId=${waitingListId}&userType=${userType}`);
+      router.push("/checkout/details");
     }
-  }, [eventId, waitingListId, router, userType]);
+  }, [router]);
 
-  // Use the Convex mutation instead of server action
-  const createCheckoutSession = useMutation(api.payments.createToyyibPayCheckoutSession);
+  const handleConfirmOrder = async () => {
+    if (!checkoutData) return;
 
-  const handleProceedToPayment = async () => {
-    if (!event || !formData || !acceptTerms || !acceptPrivacy) return;
-
-    setIsLoading(true);
+    setIsProcessing(true);
+    setError(null);
 
     try {
-      const response = await createCheckoutSession({
-        eventId,
-        waitingListId,
-        formData,
-        waiver: {
-          acceptTerms,
-          acceptPrivacy
-        }
-      });
+      // Determine booking type
+      const hasTickets = checkoutData.cartItems.some(item => item.type === "ticket");
+      const hasProducts = checkoutData.cartItems.some(item => item.type === "product");
+      
+      let bookingType: "event_tickets" | "products_only" | "event_with_products";
+      if (hasTickets && hasProducts) {
+        bookingType = "event_with_products";
+      } else if (hasTickets) {
+        bookingType = "event_tickets";
+      } else {
+        bookingType = "products_only";
+      }
 
-      // For now, we'll need to handle ToyyibPay integration client-side
-      // This is a simplified version - you'll need to implement the full ToyyibPay flow
-      alert(`Booking created successfully! Booking Reference: ${response.bookingReference}`);
+      // Prepare ticket items
+      const ticketItems = checkoutData.cartItems
+        .filter(item => item.type === "ticket")
+        .map(item => ({
+          ticket_category_id: item.id as any, // This would be the actual ticket category ID
+          quantity: item.quantity,
+          unit_price: item.price,
+        }));
+
+      // Prepare product items
+      const productItems = checkoutData.cartItems
+        .filter(item => item.type === "product")
+        .map(item => ({
+          product_id: item.id as any, // This would be the actual product ID
+          quantity: item.quantity,
+          unit_price: item.price,
+          variant_selections: [], // Would include actual variant selections
+          fulfillment_status: "pending" as const,
+          fulfillment_method: (item.requiresShipping ? "shipping" : "pickup") as "shipping" | "pickup",
+        }));
+
+             // Generate booking number
+       const bookingNumber = `TM${Date.now().toString().slice(-6)}${Math.random().toString(36).substr(2, 3).toUpperCase()}`;
+
+       // Create booking
+       const bookingId = await createBooking({
+         booking_number: bookingNumber,
+         customer_id: "sample_user_id" as any, // Would be actual authenticated user ID
+         booking_type: bookingType,
+         event_id: hasTickets ? "sample_event_id" as any : undefined, // Would be actual event ID
+         contact_info: checkoutData.contactInfo,
+         ticket_items: ticketItems.length > 0 ? ticketItems : undefined,
+         product_items: productItems.length > 0 ? productItems : undefined,
+         attendees: hasTickets ? [{
+           first_name: checkoutData.contactInfo.first_name,
+           last_name: checkoutData.contactInfo.last_name,
+           email: checkoutData.contactInfo.email,
+           ticket_category_id: ticketItems[0]?.ticket_category_id,
+         }] : undefined,
+         billing_address: checkoutData.billingAddress,
+         shipping_address: checkoutData.shippingAddress,
+         same_as_billing: checkoutData.sameAsBilling,
+         shipping_method: checkoutData.shippingOption as any,
+         shipping_cost: checkoutData.shippingCost,
+         subtotal: checkoutData.subtotal,
+         total_amount: checkoutData.total,
+         currency: "MYR",
+       });
+
+      // Clear checkout data
+      localStorage.removeItem("checkoutData");
       
-      // Clear stored data since we're proceeding to payment
-      clearCheckoutSessionData();
+      // Redirect to acknowledgement
+      router.push(`/checkout/acknowledgement?booking=${bookingId}`);
       
-      // Redirect to acknowledgement page
-      router.push(`/checkout/acknowledgement/${response.bookingReference}`);
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to proceed to payment");
-      setIsLoading(false);
+    } catch (err: any) {
+      setError(err.message || "Failed to process order. Please try again.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const handleBackToDetails = () => {
-    router.push(
-      `/checkout/details?eventId=${eventId}&waitingListId=${waitingListId}&userType=${userType}`
-    );
-  };
-
-  // Wait for auth to load
-  if (authLoading) {
-    return <Spinner />;
+  if (!checkoutData) {
+    return <div className="flex justify-center py-8">Loading...</div>;
   }
 
-  // Redirect to auth if not authenticated
-  if (!isAuthenticated) {
-    window.location.href = '/auth/login';
-    return <Spinner />;
-  }
+  const hasShippableItems = checkoutData.cartItems.some(item => item.requiresShipping);
+  const selectedShippingOption = hasShippableItems ? checkoutData.shippingOption : null;
 
-  if (!event || !formData) {
-    return <Spinner />;
-  }
-
-  // Redirect if user doesn't have valid offer
-  if (!queuePosition || queuePosition.status !== "offered" || isExpired) {
-    return <Spinner />;
-  }
-
-  const totalQuantity = formData.ticketHolders.length;
-  const totalPrice = getMinPrice(event) * totalQuantity / 100; // Convert from cents
+  // Calculate fees
+  const fees = calculateFees(checkoutData.subtotal);
+  const totalWithFees = fees.total;
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <FileText className="w-8 h-8 text-blue-600" />
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Order Summary</h1>
-          </div>
-          <p className="text-gray-600 text-lg">
-            Review your information and complete your purchase
-          </p>
-          {hasValidOffer && (
-            <Badge variant="secondary" className="mt-3 bg-amber-100 text-amber-800 hover:bg-amber-100">
-              <Clock className="w-3 h-3 mr-1" />
-              Reserved • Expires in {timeRemaining}
-            </Badge>
-          )}
-        </div>
+    <CheckoutLayout
+      currentStep={3}
+      title="Order Summary"
+      description="Review your order before payment"
+    >
 
-        {/* Progress Indicator */}
-        <Card className="mb-8">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex flex-col items-center">
-                <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium mb-2">
-                  <CheckCircle className="w-5 h-5" />
-                </div>
-                <span className="text-sm font-medium text-blue-600">Cart</span>
-              </div>
-              <div className="flex-1 h-0.5 bg-blue-200 mx-4"></div>
-              <div className="flex flex-col items-center">
-                <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium mb-2">
-                  <CheckCircle className="w-5 h-5" />
-                </div>
-                <span className="text-sm font-medium text-blue-600">Details</span>
-              </div>
-              <div className="flex-1 h-0.5 bg-blue-200 mx-4"></div>
-              <div className="flex flex-col items-center">
-                <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium mb-2">
-                  3
-                </div>
-                <span className="text-sm font-medium text-blue-600">Summary</span>
-              </div>
-              <div className="flex-1 h-0.5 bg-gray-200 mx-4"></div>
-              <div className="flex flex-col items-center">
-                <div className="w-10 h-10 bg-gray-200 text-gray-400 rounded-full flex items-center justify-center text-sm font-medium mb-2">
-                  4
-                </div>
-                <span className="text-sm font-medium text-gray-400">Payment</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {error && (
+          <Alert className="mb-6" variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Summary Content */}
-          <div className="lg:col-span-3 space-y-6">
-            {/* Buyer Information Summary */}
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* Order Details */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Contact Information */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-blue-600" />
-                  Buyer Information
+                  <User className="h-5 w-5" />
+                  Contact Information
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                    <Label className="text-sm font-medium text-gray-600">Full Name</Label>
-                    <p className="text-gray-900">{formData.buyerFullName}</p>
-                    </div>
-                    <div>
-                    <Label className="text-sm font-medium text-gray-600">Email</Label>
-                    <p className="text-gray-900">{formData.buyerEmail}</p>
-                  </div>
-                    <div>
-                    <Label className="text-sm font-medium text-gray-600">Phone</Label>
-                    <p className="text-gray-900">+60{formData.buyerPhone}</p>
-                  </div>
+              <CardContent>
+                <div className="space-y-2">
+                  <div><strong>Name:</strong> {checkoutData.contactInfo.first_name} {checkoutData.contactInfo.last_name}</div>
+                  <div><strong>Email:</strong> {checkoutData.contactInfo.email}</div>
+                  {checkoutData.contactInfo.phone && (
+                    <div><strong>Phone:</strong> {checkoutData.contactInfo.phone}</div>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Ticket Holders Summary */}
-            {formData.ticketHolders.map((holder, index) => (
-              <Card key={index}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="w-5 h-5 text-blue-600" />
-                    Ticket Holder #{index + 1}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                      <Label className="text-sm font-medium text-gray-600">Full Name</Label>
-                      <p className="text-gray-900">{holder.fullName}</p>
-                      </div>
-                      <div>
-                      <Label className="text-sm font-medium text-gray-600">Email</Label>
-                      <p className="text-gray-900">{holder.email}</p>
-                      </div>
-                      <div>
-                      <Label className="text-sm font-medium text-gray-600">Phone</Label>
-                      <p className="text-gray-900">+60{holder.phone}</p>
-                      </div>
-                      <div>
-                      <Label className="text-sm font-medium text-gray-600">IC/Passport</Label>
-                      <p className="text-gray-900">{holder.icPassport}</p>
-                      </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-600">Date of Birth</Label>
-                      <p className="text-gray-900">{holder.dateOfBirth ? new Date(holder.dateOfBirth).toLocaleDateString() : "Not provided"}</p>
-                    </div>
-                      <div>
-                      <Label className="text-sm font-medium text-gray-600">Gender</Label>
-                      <p className="text-gray-900">{holder.gender}</p>
-                      </div>
-                      <div>
-                      <Label className="text-sm font-medium text-gray-600">Country</Label>
-                      <p className="text-gray-900">{holder.country}</p>
-                      </div>
-                    {holder.country === "Malaysia" && (
-                      <div>
-                        <Label className="text-sm font-medium text-gray-600">State</Label>
-                        <p className="text-gray-900">{holder.state}</p>
-                      </div>
-                    )}
-                        <div>
-                      <Label className="text-sm font-medium text-gray-600">Postcode</Label>
-                      <p className="text-gray-900">{holder.postcode}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">Address</Label>
-                    <p className="text-gray-900">{holder.address}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-
-            {/* Special Requests */}
-            {formData.specialRequests && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Special Requests</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-900">{formData.specialRequests}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Terms & Privacy */}
+            {/* Order Items */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-blue-600" />
-                  Terms & Privacy
+                  <Package className="h-5 w-5" />
+                  Order Items
                 </CardTitle>
-                <CardDescription>
-                  Please accept our terms and privacy policy to proceed
-                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center space-x-2">
-                                     <Checkbox
-                    id="terms"
-                     checked={acceptTerms}
-                    onCheckedChange={(checked) => setAcceptTerms(checked === true)}
-                   />
-                  <Label htmlFor="terms" className="text-sm font-normal">
-                    I accept the{" "}
-                    <a href="/terms" className="text-blue-600 hover:underline">
-                      Terms and Conditions
-                    </a>
-                    </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                                     <Checkbox
-                    id="privacy"
-                     checked={acceptPrivacy}
-                    onCheckedChange={(checked) => setAcceptPrivacy(checked === true)}
-                   />
-                  <Label htmlFor="privacy" className="text-sm font-normal">
-                    I accept the{" "}
-                    <a href="/privacy" className="text-blue-600 hover:underline">
-                      Privacy Policy
-                    </a>
-                    </Label>
+              <CardContent>
+                <div className="space-y-4">
+                  {checkoutData.cartItems.map((item, index) => (
+                    <div key={index} className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="font-medium">{item.name}</div>
+                        {item.variant && (
+                          <div className="text-sm text-muted-foreground">{item.variant}</div>
+                        )}
+                        <div className="text-sm text-muted-foreground">Quantity: {item.quantity}</div>
+                        <div className="flex gap-2 mt-2">
+                          <Badge variant={item.type === "ticket" ? "default" : "secondary"}>
+                            {item.type === "ticket" ? "Ticket" : "Product"}
+                          </Badge>
+                          {item.requiresShipping && (
+                            <Badge variant="outline">Requires Shipping</Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium">RM {((item.price * item.quantity) / 100).toFixed(2)}</div>
+                        <div className="text-sm text-muted-foreground">RM {(item.price / 100).toFixed(2)} each</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
-          </div>
 
-          {/* Order Summary Sidebar */}
-          <div className="lg:col-span-1">
-            <Card className="sticky top-8">
-              <CardHeader>
-                <CardTitle>Order Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Event Summary */}
-                {imageUrl && (
-                  <div className="aspect-video rounded-lg overflow-hidden">
-                    <Image
-                      src={imageUrl}
-                      alt={event.name}
-                      width={300}
-                      height={200}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                )}
-                
-                <div>
-                  <h4 className="font-semibold text-base mb-3">{event.name}</h4>
-                  <div className="space-y-2 text-sm text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      <span>{new Date(event.event_date).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
-                      <span>{new Date(event.event_date).toLocaleTimeString()}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4" />
-                      <span>{event.location}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Price Breakdown */}
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span>Ticket × {totalQuantity}</span>
-                    <span>RM {totalPrice.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Service Fee</span>
-                    <span>RM 0.00</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between font-semibold">
-                    <span>Total</span>
-                    <span>RM {totalPrice.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Countdown Timer */}
-                {hasValidOffer && !isExpired && (
-                  <div className="bg-red-50 p-3 rounded-lg text-center border border-red-200">
-                    <div className="text-sm text-red-700 mb-1">Queue expires in</div>
-                    <div className="text-lg font-bold text-red-900">{timeRemaining}</div>
-                  </div>
-                )}
-
-                {/* Navigation Buttons */}
-                <div className="space-y-3">
-                  <Button
-                    onClick={handleProceedToPayment}
-                    disabled={isLoading || !acceptTerms || !acceptPrivacy || !hasValidOffer || isExpired}
-                    className="w-full bg-blue-600 hover:bg-blue-700"
-                    size="lg"
-                  >
-                    {isLoading ? (
-                      "Processing..."
+            {/* Addresses - only show if we have shippable items */}
+            {hasShippableItems && (
+              <>
+                {/* Billing Address */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CreditCard className="h-5 w-5" />
+                      Billing Address
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {checkoutData.billingAddress ? (
+                      <div className="space-y-1">
+                        <div>{checkoutData.billingAddress.first_name} {checkoutData.billingAddress.last_name}</div>
+                        {checkoutData.billingAddress.company && <div>{checkoutData.billingAddress.company}</div>}
+                        <div>{checkoutData.billingAddress.address_line_1}</div>
+                        {checkoutData.billingAddress.address_line_2 && <div>{checkoutData.billingAddress.address_line_2}</div>}
+                        <div>{checkoutData.billingAddress.city}, {checkoutData.billingAddress.state_province} {checkoutData.billingAddress.postal_code}</div>
+                        <div>{checkoutData.billingAddress.country}</div>
+                        {checkoutData.billingAddress.phone && <div>{checkoutData.billingAddress.phone}</div>}
+                      </div>
                     ) : (
-                      <>
-                        Proceed to Payment
-                        <ArrowRight className="w-4 h-4 ml-2" />
-                      </>
+                      <div className="text-muted-foreground">No billing address provided</div>
                     )}
-                  </Button>
-                  
-                  <Button
-                    onClick={handleBackToDetails}
-                    variant="outline"
-                    className="w-full"
-                    size="lg"
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back to Details
-                  </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Shipping Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      {selectedShippingOption?.startsWith('pickup') ? <MapPin className="h-5 w-5" /> : <Truck className="h-5 w-5" />}
+                      Shipping & Delivery
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Shipping Method */}
+                      <div>
+                        <div className="font-medium mb-2">Delivery Method</div>
+                        <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+                          <div>
+                            <div className="font-medium">
+                              {selectedShippingOption?.startsWith('pickup') ? 'Pickup' : 'Shipping'}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {selectedShippingOption?.startsWith('pickup') ? 'Self pickup' : 'Delivery to address'}
+                            </div>
+                          </div>
+                          <div className="font-medium">
+                            {checkoutData.shippingCost === 0 ? 'FREE' : `RM ${(checkoutData.shippingCost / 100).toFixed(2)}`}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Shipping Address */}
+                      {!selectedShippingOption?.startsWith('pickup') && (
+                        <div>
+                          <div className="font-medium mb-2">Shipping Address</div>
+                          {checkoutData.sameAsBilling ? (
+                            <div className="p-3 bg-muted rounded-md">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Check className="h-4 w-4 text-green-600" />
+                                <span className="text-sm">Same as billing address</span>
+                              </div>
+                              <div className="space-y-1 text-sm">
+                                <div>{checkoutData.billingAddress?.first_name} {checkoutData.billingAddress?.last_name}</div>
+                                <div>{checkoutData.billingAddress?.address_line_1}</div>
+                                <div>{checkoutData.billingAddress?.city}, {checkoutData.billingAddress?.state_province} {checkoutData.billingAddress?.postal_code}</div>
+                              </div>
+                            </div>
+                          ) : checkoutData.shippingAddress ? (
+                            <div className="p-3 bg-muted rounded-md space-y-1 text-sm">
+                              <div>{checkoutData.shippingAddress.first_name} {checkoutData.shippingAddress.last_name}</div>
+                              {checkoutData.shippingAddress.company && <div>{checkoutData.shippingAddress.company}</div>}
+                              <div>{checkoutData.shippingAddress.address_line_1}</div>
+                              {checkoutData.shippingAddress.address_line_2 && <div>{checkoutData.shippingAddress.address_line_2}</div>}
+                              <div>{checkoutData.shippingAddress.city}, {checkoutData.shippingAddress.state_province} {checkoutData.shippingAddress.postal_code}</div>
+                              <div>{checkoutData.shippingAddress.country}</div>
+                            </div>
+                          ) : (
+                            <div className="text-muted-foreground">No shipping address provided</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </div>
+
+          {/* Payment Summary */}
+          <div className="lg:col-span-1">
+            <Card className="sticky top-4">
+              <CardHeader>
+                <CardTitle>Payment Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span>RM {(checkoutData.subtotal / 100).toFixed(2)}</span>
+                  </div>
+                  {checkoutData.shippingCost > 0 && (
+                    <div className="flex justify-between">
+                      <span>Shipping</span>
+                      <span>RM {(checkoutData.shippingCost / 100).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {hasShippableItems && checkoutData.shippingCost === 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Shipping</span>
+                      <span>FREE</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>Service Fee</span>
+                    <span>RM {(fees.serviceFee / 100).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Processing Fee</span>
+                    <span>RM {(fees.processingFee / 100).toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="flex justify-between font-semibold text-lg">
+                  <span>Total</span>
+                  <span>RM {((totalWithFees + checkoutData.shippingCost) / 100).toFixed(2)}</span>
+                </div>
+
+                <Button 
+                  onClick={handleConfirmOrder}
+                  className="w-full"
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? (
+                    "Processing..."
+                  ) : (
+                    <>
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      Confirm & Pay
+                    </>
+                  )}
+                </Button>
+
+                <div className="text-xs text-muted-foreground text-center">
+                  By confirming your order, you agree to our terms and conditions.
                 </div>
               </CardContent>
             </Card>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-export default function SummaryPage() {
-  return (
-    <Suspense fallback={<Spinner />}>
-      <SummaryContent />
-    </Suspense>
+    </CheckoutLayout>
   );
 } 

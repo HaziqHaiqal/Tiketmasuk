@@ -1,60 +1,102 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
-import { createCategory } from "./eventHelpers";
+
+// ============================================================================
+// BASIC EVENT CRUD OPERATIONS
+// ============================================================================
 
 export const create = mutation({
   args: {
-    name: v.string(),
+    title: v.string(),
     description: v.string(),
-    location: v.string(),
-    event_date: v.number(),
+    start_datetime: v.number(),
     organizer_id: v.id("organizer_profiles"),
-    image_storage_id: v.optional(v.id("_storage")),
-    categories: v.array(v.object({
-      id: v.string(),
-      name: v.string(),
-      description: v.string(),
-      total_tickets: v.number(),
-      available_tickets: v.number(),
-      is_active: v.boolean(),
-      pricing_tiers: v.array(v.object({
-        id: v.string(),
-        name: v.string(),
-        description: v.optional(v.string()),
-        price: v.number(),
-        availability_type: v.union(
-          v.literal("time_based"),
-          v.literal("quantity_based"),
-          v.literal("unlimited")
-        ),
-        sale_start_date: v.optional(v.number()),
-        sale_end_date: v.optional(v.number()),
-        max_tickets: v.optional(v.number()),
-        tickets_sold: v.optional(v.number()),
-        is_active: v.boolean(),
-        sort_order: v.number(),
-      })),
-      sort_order: v.number(),
-    })),
+    featured_image_storage_id: v.optional(v.id("_storage")),
+    event_category: v.optional(v.union(
+      v.literal("sports"), v.literal("music"), v.literal("food"),
+      v.literal("travel"), v.literal("technology"), v.literal("arts"),
+      v.literal("business"), v.literal("education"), v.literal("health"),
+      v.literal("entertainment")
+    )),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("events", {
-      ...args,
-      is_published: false,
-      created_at: Date.now(),
-    });
-  },
-});
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Must be logged in to create events");
+    }
 
-export const getAll = query({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db
-      .query("events")
-      .withIndex("by_status", (q) => q.eq("is_published", true))
-      .order("desc")
-      .collect();
+    // Generate slug from title
+    const slug = args.title.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    // Simple fraud analysis
+    let fraudScore = 0;
+    const riskFactors: ("new_organizer" | "vague_description" | "unrealistic_claims")[] = [];
+
+    // Check description quality
+    if (args.description.length < 100) {
+      fraudScore += 20;
+      riskFactors.push("vague_description");
+    }
+
+    // Check for suspicious terms
+    const suspiciousTerms = ["guaranteed profit", "get rich quick", "no risk"];
+    if (suspiciousTerms.some(term => 
+      args.title.toLowerCase().includes(term) || 
+      args.description.toLowerCase().includes(term)
+    )) {
+      fraudScore += 30;
+      riskFactors.push("unrealistic_claims");
+    }
+
+    // Determine moderation status
+    const moderationStatus = fraudScore <= 20 ? "approved" : "pending_review";
+    const eventStatus = fraudScore <= 20 ? "approved" : "pending";
+
+    const eventId = await ctx.db.insert("events", {
+      title: args.title,
+      slug: slug,
+      description: args.description,
+      start_datetime: args.start_datetime,
+      timezone: "Asia/Kuala_Lumpur",
+      location_type: "physical",
+      organizer_id: args.organizer_id,
+      featured_image_storage_id: args.featured_image_storage_id,
+      event_category: args.event_category,
+      is_free: false,
+      visibility: "public",
+      
+      // Moderation fields
+      status: eventStatus,
+      moderation_status: moderationStatus,
+      fraud_score: fraudScore,
+      risk_factors: riskFactors,
+      requires_manual_review: fraudScore > 20,
+      submitted_for_review_at: Date.now(),
+      
+      created_at: Date.now(),
+      updated_at: Date.now(),
+    });
+
+    // Create moderation log
+    if (fraudScore > 20) {
+      await ctx.db.insert("admin_moderation_logs", {
+        event_id: eventId,
+        admin_id: identity.subject as any,
+        admin_name: identity.name || "System",
+        action: "submitted_for_review",
+        previous_status: "draft",
+        new_status: eventStatus,
+        fraud_score_at_review: fraudScore,
+        risk_factors_at_review: riskFactors.map(f => f as string),
+        is_automated_decision: false,
+        created_at: Date.now(),
+      });
+    }
+
+    return eventId;
   },
 });
 
@@ -62,6 +104,19 @@ export const getById = query({
   args: { event_id: v.id("events") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.event_id);
+  },
+});
+
+export const getUpcoming = query({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    return await ctx.db
+      .query("events")
+      .withIndex("by_status", (q) => q.eq("status", "published"))
+      .filter((q) => q.gt(q.field("start_datetime"), now))
+      .order("asc")
+      .take(20);
   },
 });
 
@@ -76,196 +131,70 @@ export const getByOrganizer = query({
   },
 });
 
-export const getPublished = query({
-  handler: async (ctx) => {
-    return await ctx.db
-      .query("events")
-      .withIndex("by_status", (q) => q.eq("is_published", true))
-      .order("desc")
-      .collect();
-  },
-});
-
-export const getUpcoming = query({
-  handler: async (ctx) => {
-    const now = Date.now();
-    return await ctx.db
-      .query("events")
-      .withIndex("by_status", (q) => q.eq("is_published", true))
-      .filter((q) => q.gt(q.field("event_date"), now))
-      .order("asc")
-      .collect();
-  },
-});
-
-export const searchEvents = query({
+export const update = mutation({
   args: {
-    query: v.optional(v.string()),
-    location: v.optional(v.string()),
-    date_from: v.optional(v.number()),
-    date_to: v.optional(v.number()),
+    event_id: v.id("events"),
+    title: v.optional(v.string()),
+    description: v.optional(v.string()),
+    start_datetime: v.optional(v.number()),
+    featured_image_storage_id: v.optional(v.id("_storage")),
+    event_category: v.optional(v.union(
+      v.literal("sports"), v.literal("music"), v.literal("food"),
+      v.literal("travel"), v.literal("technology"), v.literal("arts"),
+      v.literal("business"), v.literal("education"), v.literal("health"),
+      v.literal("entertainment")
+    )),
   },
   handler: async (ctx, args) => {
-    let events = await ctx.db
-      .query("events")
-      .withIndex("by_status", (q) => q.eq("is_published", true))
-      .collect();
-
-    // Filter by search query
-    if (args.query) {
-      const searchTerm = args.query.toLowerCase();
-      events = events.filter(event =>
-        event.name.toLowerCase().includes(searchTerm) ||
-        event.description.toLowerCase().includes(searchTerm) ||
-        event.location.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    // Filter by location
-    if (args.location) {
-      events = events.filter(event =>
-        event.location.toLowerCase().includes(args.location!.toLowerCase())
-      );
-    }
-
-    // Filter by date range
-    if (args.date_from) {
-      events = events.filter(event => event.event_date >= args.date_from!);
-    }
-    if (args.date_to) {
-      events = events.filter(event => event.event_date <= args.date_to!);
-    }
-
-    return events;
-  },
-});
-
-export const getEventWithDetails = query({
-  args: { event_id: v.id("events") },
-  handler: async (ctx, args) => {
-    const event = await ctx.db.get(args.event_id);
-    if (!event) return null;
-
-    // Get organizer profile
-    const organizerProfile = await ctx.db.get(event.organizer_id);
-
-    // Get products for this event
-    const products = await ctx.db
-      .query("products")
-      .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
-      .collect();
-
-    // Get promo codes for this event
-    const promoCodes = await ctx.db
-      .query("promo_codes")
-      .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
-      .filter((q) => q.eq(q.field("is_active"), true))
-      .collect();
-
-    return {
-      event,
-      organizer_profile: organizerProfile,
-      products,
-      promo_codes: promoCodes,
+    const { event_id, ...updates } = args;
+    
+    const updateData: any = {
+      ...updates,
+      updated_at: Date.now(),
     };
-  },
-});
 
-// Get tickets sold for a specific category (from bookings)
-export const getCategorySoldTickets = query({
-  args: {
-    event_id: v.id("events"),
-    category_id: v.string(),
-  },
-  handler: async (ctx, args) => {
-    // Get all completed bookings for this event
-    const bookings = await ctx.db
-      .query("bookings")
-      .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
-      .filter((q) => q.eq(q.field("status"), "completed"))
-      .collect();
-
-    // Sum up tickets for this category from booking_details
-    let totalSold = 0;
-    for (const booking of bookings) {
-      for (const detail of booking.booking_details) {
-        if (detail.category_id === args.category_id) {
-          totalSold += detail.quantity;
-        }
-      }
+    // Update slug if title changed
+    if (updates.title) {
+      updateData.slug = updates.title.toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
     }
 
-    return totalSold;
+    await ctx.db.patch(event_id, updateData);
+    return await ctx.db.get(event_id);
   },
 });
 
-// Get total tickets sold for an event (from bookings)
-export const getEventSoldTickets = query({
+export const publish = mutation({
   args: { event_id: v.id("events") },
-  handler: async (ctx, args) => {
-    // Get all completed bookings for this event
-    const bookings = await ctx.db
-      .query("bookings")
-      .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
-      .filter((q) => q.eq(q.field("status"), "completed"))
-      .collect();
-
-    // Sum up all tickets from booking_details
-    let totalSold = 0;
-    for (const booking of bookings) {
-      for (const detail of booking.booking_details) {
-        totalSold += detail.quantity;
-      }
-    }
-
-    return totalSold;
-  },
-});
-
-export const updateEvent = mutation({
-  args: {
-    event_id: v.id("events"),
-    updates: v.object({
-      name: v.optional(v.string()),
-      description: v.optional(v.string()),
-      location: v.optional(v.string()),
-      event_date: v.optional(v.number()),
-      image_storage_id: v.optional(v.id("_storage")),
-      is_published: v.optional(v.boolean()),
-      categories: v.optional(v.array(v.object({
-        id: v.string(),
-        name: v.string(),
-        description: v.string(),
-        total_tickets: v.number(),
-        available_tickets: v.number(),
-        is_active: v.boolean(),
-        pricing_tiers: v.array(v.object({
-          id: v.string(),
-          name: v.string(),
-          description: v.optional(v.string()),
-          price: v.number(),
-          availability_type: v.union(
-            v.literal("time_based"),
-            v.literal("quantity_based"),
-            v.literal("unlimited")
-          ),
-          sale_start_date: v.optional(v.number()),
-          sale_end_date: v.optional(v.number()),
-          max_tickets: v.optional(v.number()),
-          tickets_sold: v.optional(v.number()),
-          is_active: v.boolean(),
-          sort_order: v.number(),
-        })),
-        sort_order: v.number(),
-      }))),
-    }),
-  },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.event_id, {
-      ...args.updates,
+      status: "published",
+      published_at: Date.now(),
       updated_at: Date.now(),
     });
+    return await ctx.db.get(args.event_id);
+  },
+});
 
+export const unpublish = mutation({
+  args: { event_id: v.id("events") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.event_id, {
+      status: "draft",
+      updated_at: Date.now(),
+    });
+    return await ctx.db.get(args.event_id);
+  },
+});
+
+export const cancel = mutation({
+  args: { event_id: v.id("events") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.event_id, {
+      status: "cancelled",
+      updated_at: Date.now(),
+    });
     return await ctx.db.get(args.event_id);
   },
 });
@@ -288,488 +217,658 @@ export const deleteEvent = mutation({
   },
 });
 
-export const publishEvent = mutation({
-  args: { event_id: v.id("events") },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.event_id, {
-      is_published: true,
-      updated_at: Date.now(),
-    });
-
-    return await ctx.db.get(args.event_id);
-  },
-});
-
-export const unpublishEvent = mutation({
-  args: { event_id: v.id("events") },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.event_id, {
-      is_published: false,
-      updated_at: Date.now(),
-    });
-
-    return await ctx.db.get(args.event_id);
-  },
-});
-
-// Create organizer profile (simplified - starts as pending for admin review)
-export const createOrganizerProfile = mutation({
-  args: {
-    user_id: v.string(),
-    display_name: v.string(),
-    full_name: v.string(),
-    store_name: v.string(),
-    business_registration: v.optional(v.string()),
-    phone: v.optional(v.string()),
-    website: v.optional(v.string()),
-    store_description: v.optional(v.string()),
-    organizer_type: v.union(
-      v.literal("individual"),
-      v.literal("group"),
-      v.literal("organization"),
-      v.literal("business")
-    ),
-    primary_location: v.string(),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.db.insert("organizer_profiles", {
-      user_id: args.user_id,
-      display_name: args.display_name,
-      full_name: args.full_name,
-      store_name: args.store_name,
-      business_registration: args.business_registration,
-      phone: args.phone,
-      website: args.website,
-      store_description: args.store_description,
-      organizer_type: args.organizer_type,
-      primary_location: args.primary_location,
-      verification_status: "unverified",
-      status: "pending", // New organizers start as pending for admin approval
-      created_at: Date.now(),
-    });
-  },
-});
-
-export const updateCategoryAvailability = mutation({
-  args: {
-    event_id: v.id("events"),
-    category_id: v.string(),
-    available_tickets: v.number(),
-  },
-  handler: async (ctx, args) => {
-    const event = await ctx.db.get(args.event_id);
-    if (!event) return;
-
-    const updatedCategories = event.categories.map(category => {
-      if (category.id === args.category_id) {
-        return { ...category, available_tickets: args.available_tickets };
-      }
-      return category;
-    });
-
-    await ctx.db.patch(args.event_id, {
-      categories: updatedCategories,
-      updated_at: Date.now(),
-    });
-  },
-});
-
-/**
- * Get available categories for an event
- */
-export const getEventCategories = query({
-  args: { event_id: v.id("events") },
-  handler: async (ctx, args) => {
-    const event = await ctx.db.get(args.event_id);
-    if (!event) return [];
-
-    const now = Date.now();
-    return event.categories
-      .filter(category => category.is_active)
-      .map(category => ({
-        ...category,
-        pricing_tiers: category.pricing_tiers
-          .filter(tier => {
-            if (!tier.is_active) return false;
-
-            // Check time-based availability
-            if (tier.availability_type === "time_based") {
-              if (tier.sale_start_date && now < tier.sale_start_date) return false;
-              if (tier.sale_end_date && now > tier.sale_end_date) return false;
-            }
-
-            // Check quantity-based availability
-            if (tier.availability_type === "quantity_based") {
-              if (tier.max_tickets && tier.tickets_sold && tier.tickets_sold >= tier.max_tickets) return false;
-            }
-
-            return true;
-          })
-          .sort((a, b) => a.sort_order - b.sort_order)
-      }))
-      .sort((a, b) => a.sort_order - b.sort_order);
-  },
-});
-
-/**
- * Get the best available pricing tier for a category (cheapest available)
- */
-export const getBestPricingTier = query({
-  args: {
-    event_id: v.id("events"),
-    category_id: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const event = await ctx.db.get(args.event_id);
-    if (!event) return null;
-
-    const category = event.categories.find(cat => cat.id === args.category_id);
-    if (!category) return null;
-
-    const now = Date.now();
-    const availableTiers = category.pricing_tiers
-      .filter(tier => {
-        if (!tier.is_active) return false;
-
-        // Check time-based availability
-        if (tier.availability_type === "time_based") {
-          if (tier.sale_start_date && now < tier.sale_start_date) return false;
-          if (tier.sale_end_date && now > tier.sale_end_date) return false;
-        }
-
-        // Check quantity-based availability
-        if (tier.availability_type === "quantity_based") {
-          if (tier.max_tickets && tier.tickets_sold && tier.tickets_sold >= tier.max_tickets) return false;
-        }
-
-        return true;
-      })
-      .sort((a, b) => a.sort_order - b.sort_order);
-
-    return availableTiers[0] || null;
-  },
-});
-
-/**
- * Get category availability info
- */
-export const getCategoryAvailability = query({
-  args: {
-    event_id: v.id("events"),
-    category_id: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const event = await ctx.db.get(args.event_id);
-    if (!event) return null;
-
-    const category = event.categories.find(cat => cat.id === args.category_id);
-    if (!category) return null;
-
-    // Count purchased tickets for this category from bookings
-    const bookings = await ctx.db
-      .query("bookings")
-      .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
-      .filter((q) => q.eq(q.field("status"), "completed"))
-      .collect();
-
-    let purchasedCount = 0;
-    for (const booking of bookings) {
-      for (const detail of booking.booking_details) {
-        if (detail.category_id === args.category_id) {
-          purchasedCount += detail.quantity;
-        }
-      }
-    }
-
-    return {
-      total_tickets: category.total_tickets,
-      available_tickets: category.available_tickets,
-      purchased_count: purchasedCount,
-    };
-  },
-});
-
-/**
- * Get overall event availability (sum of all categories)
- */
-export const getEventAvailability = query({
-  args: { event_id: v.id("events") },
-  handler: async (ctx, args) => {
-    const event = await ctx.db.get(args.event_id);
-    if (!event) return null;
-
-    // Calculate totals across all categories
-    const totalTickets = event.categories.reduce((sum, cat) => sum + cat.total_tickets, 0);
-    const availableTickets = event.categories.reduce((sum, cat) => sum + cat.available_tickets, 0);
-
-    // Count all purchased tickets from bookings
-    const bookings = await ctx.db
-      .query("bookings")
-      .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
-      .filter((q) => q.eq(q.field("status"), "completed"))
-      .collect();
-
-    let purchasedCount = 0;
-    for (const booking of bookings) {
-      for (const detail of booking.booking_details) {
-        purchasedCount += detail.quantity;
-      }
-    }
-
-    return {
-      totalTickets,
-      availableTickets,
-      purchasedCount,
-      reservedCount: 0,
-    };
-  },
-});
+// ============================================================================
+// SEARCH AND FILTERING
+// ============================================================================
 
 export const search = query({
-  args: { searchTerm: v.string() },
+  args: {
+    query: v.optional(v.string()),
+    category: v.optional(v.string()),
+    date_from: v.optional(v.number()),
+    date_to: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
-    if (!args.searchTerm.trim()) {
-      return [];
-    }
-
-    const events = await ctx.db
+    let events = await ctx.db
       .query("events")
-      .withIndex("by_status", (q) => q.eq("is_published", true))
+      .withIndex("by_status", (q) => q.eq("status", "published"))
       .collect();
 
-    // Simple text search in name, description, and location
-    const searchTerm = args.searchTerm.toLowerCase();
-    return events.filter(event =>
-      !event.is_cancelled &&
-      (event.name.toLowerCase().includes(searchTerm) ||
-        event.description.toLowerCase().includes(searchTerm) ||
-        event.location.toLowerCase().includes(searchTerm))
-    );
+    // Filter by search query
+    if (args.query) {
+      const searchTerm = args.query.toLowerCase();
+      events = events.filter(event =>
+        event.title.toLowerCase().includes(searchTerm) ||
+        event.description.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    // Filter by category
+    if (args.category) {
+      events = events.filter(event => event.event_category === args.category);
+    }
+
+    // Filter by date range
+    if (args.date_from) {
+      events = events.filter(event => event.start_datetime >= args.date_from!);
+    }
+    if (args.date_to) {
+      events = events.filter(event => event.start_datetime <= args.date_to!);
+    }
+
+    return events;
   },
 });
 
-export const cancelEvent = mutation({
-  args: { event_id: v.id("events") },
-  handler: async (ctx, args) => {
-    const event = await ctx.db.get(args.event_id);
-    if (!event) return;
+// ============================================================================
+// ADMIN MODERATION FUNCTIONS
+// ============================================================================
 
-    await ctx.db.patch(args.event_id, {
-      is_cancelled: true,
-      updated_at: Date.now(),
-    });
-  },
-});
-
-export const getUserEvents = query({
-  args: { user_id: v.string() },
-  handler: async (ctx, args) => {
-    // Get organizer profile for this user
-    const organizerProfile = await ctx.db
-      .query("organizer_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", args.user_id))
-      .first();
-
-    if (!organizerProfile) {
-      return [];
+export const getPendingReview = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
     }
 
     return await ctx.db
       .query("events")
-      .withIndex("by_organizer", (q) => q.eq("organizer_id", organizerProfile._id))
+      .withIndex("by_moderation_status", (q) => q.eq("moderation_status", "pending_review"))
       .order("desc")
-      .collect();
+      .take(50);
   },
 });
 
-export const get = query({
-  handler: async (ctx) => {
-    const events = await ctx.db
-      .query("events")
-      .withIndex("by_status", (q) => q.eq("is_published", true))
-      .collect();
-
-    // Filter out cancelled events in JavaScript
-    return events.filter(event => !event.is_cancelled);
-  },
-});
-
-export const update = mutation({
-  args: {
+export const submitForReview = mutation({
+  args: { 
     event_id: v.id("events"),
-    updates: v.object({
-      name: v.optional(v.string()),
-      description: v.optional(v.string()),
-      location: v.optional(v.string()),
-      event_date: v.optional(v.number()),
-      categories: v.optional(v.array(v.object({
-        id: v.string(),
-        name: v.string(),
-        description: v.string(),
-        total_tickets: v.number(),
-        available_tickets: v.number(),
-        is_active: v.boolean(),
-        pricing_tiers: v.array(v.object({
-          id: v.string(),
-          name: v.string(),
-          description: v.optional(v.string()),
-          price: v.number(),
-          availability_type: v.union(
-            v.literal("time_based"),
-            v.literal("quantity_based"),
-            v.literal("unlimited")
-          ),
-          sale_start_date: v.optional(v.number()),
-          sale_end_date: v.optional(v.number()),
-          max_tickets: v.optional(v.number()),
-          tickets_sold: v.optional(v.number()),
-          is_active: v.boolean(),
-          sort_order: v.number(),
-        })),
-        sort_order: v.number(),
-      }))),
-      image_storage_id: v.optional(v.id("_storage")),
-      is_published: v.optional(v.boolean()),
-    }),
-  },
-  handler: async (ctx, args) => {
-    const event = await ctx.db.get(args.event_id);
-    if (!event) return;
-
-    await ctx.db.patch(args.event_id, {
-      ...args.updates,
-      updated_at: Date.now(),
-    });
-  },
-});
-
-/**
- * Check if a user is the organizer/owner of an event
- */
-export const isUserEventOwner = query({
-  args: {
-    event_id: v.id("events"),
-    user_id: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const event = await ctx.db.get(args.event_id);
-    if (!event) return false;
-
-    // Get organizer profile for this user
-    const organizerProfile = await ctx.db
-      .query("organizer_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", args.user_id))
-      .first();
-
-    if (!organizerProfile) return false;
-
-    return event.organizer_id === organizerProfile._id;
-  },
-});
-
-/**
- * Create an event from organizer input (simple format)
- * Organizers only need to provide human-readable info, system generates IDs
- */
-export const createEventFromOrganizerInput = mutation({
-  args: {
-    // Basic event info
-    title: v.string(),
-    description: v.string(),
-    date: v.string(), // "2025-05-15"
-    time: v.string(), // "07:00"
-    location: v.string(),
-    image_url: v.optional(v.string()),
-
-    // Categories with simple pricing tiers
-    categories: v.array(v.object({
-      name: v.string(),
-      description: v.string(),
-      total_tickets: v.number(),
-      pricing_tiers: v.array(v.object({
-        name: v.string(),
-        description: v.optional(v.string()),
-        price: v.number(), // In RM (e.g., 10.50)
-        type: v.union(v.literal("time_based"), v.literal("quantity_based"), v.literal("unlimited")),
-        sale_start: v.optional(v.string()), // "2025-04-15" (for time_based)
-        sale_end: v.optional(v.string()),   // "2025-04-20" (for time_based)
-        max_quantity: v.optional(v.number()), // For quantity_based
-      }))
-    }))
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("Must be logged in to create events");
+      throw new Error("Not authenticated");
     }
 
-    // We don't need to manage users table directly since Convex Auth handles it
-    // Just proceed with organizer profile creation/verification
-
-    // Get or create organizer profile for this user
-    let organizerProfile = await ctx.db
-      .query("organizer_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", identity.subject))
-      .first();
-
-    if (!organizerProfile) {
-      throw new Error("Organizer profile not found. Please create an organizer profile first.");
-    }
-
-    if (!organizerProfile) {
-      throw new Error("Failed to create organizer profile");
-    }
-
-    // Check if organizer is approved to create events
-    if (organizerProfile.status !== "active") {
-      if (organizerProfile.status === "pending") {
-        throw new Error("Your organizer account is pending approval. Please wait for admin review before creating events.");
-      } else if (organizerProfile.status === "suspended") {
-        throw new Error("Your organizer account has been suspended. Please contact support.");
-      }
-    }
-
-    // Convert date/time to timestamp
-    const eventDateTime = new Date(`${args.date}T${args.time}:00`).getTime();
-
-    // Helper function to convert date string to timestamp
-    const dateToTimestamp = (dateStr: string) => new Date(`${dateStr}T00:00:00`).getTime();
-
-    // Process categories with auto-generated IDs
-    const processedCategories = args.categories.map((category, categoryIndex) => {
-      const pricingTiers = category.pricing_tiers.map((tier, tierIndex) => ({
-        name: tier.name,
-        description: tier.description,
-        price: Math.round(tier.price * 100), // Convert RM to cents
-        availability_type: tier.type,
-        sale_start_date: tier.sale_start ? dateToTimestamp(tier.sale_start) : undefined,
-        sale_end_date: tier.sale_end ? dateToTimestamp(tier.sale_end) : undefined,
-        max_tickets: tier.max_quantity,
-        sort_order: tierIndex + 1,
-      }));
-
-      return createCategory(
-        category.name,
-        category.description,
-        category.total_tickets,
-        categoryIndex + 1,
-        pricingTiers
-      );
+    await ctx.db.patch(args.event_id, {
+      status: "pending",
+      moderation_status: "pending_review",
+      submitted_for_review_at: Date.now(),
+      updated_at: Date.now(),
     });
 
-    // Create the event
-    const eventId = await ctx.db.insert("events", {
-      organizer_id: organizerProfile._id,
-      name: args.title,
-      description: args.description,
-      event_date: eventDateTime,
-      location: args.location,
-      image_storage_id: undefined,
-      categories: processedCategories,
-      is_published: true,
+    // Create moderation log
+    await ctx.db.insert("admin_moderation_logs", {
+      event_id: args.event_id,
+      admin_id: identity.subject as any,
+      admin_name: identity.name || "System",
+      action: "submitted_for_review",
+      previous_status: "draft",
+      new_status: "pending",
+      is_automated_decision: false,
       created_at: Date.now(),
     });
 
-    return eventId;
+    return { success: true };
+  },
+});
+
+export const adminApprove = mutation({
+  args: {
+    event_id: v.id("events"),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    await ctx.db.patch(args.event_id, {
+      status: "approved",
+      moderation_status: "approved",
+      reviewed_at: Date.now(),
+      reviewed_by: identity.subject as any,
+      admin_notes: args.notes,
+      updated_at: Date.now(),
+    });
+
+    // Create approval log
+    await ctx.db.insert("admin_moderation_logs", {
+      event_id: args.event_id,
+      admin_id: identity.subject as any,
+      admin_name: identity.name || "Admin",
+      action: "approved",
+      previous_status: "pending",
+      new_status: "approved",
+      admin_notes: args.notes,
+      is_automated_decision: false,
+      created_at: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+export const adminReject = mutation({
+  args: {
+    event_id: v.id("events"),
+    reason: v.string(),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    await ctx.db.patch(args.event_id, {
+      status: "rejected",
+      moderation_status: "rejected",
+      reviewed_at: Date.now(),
+      reviewed_by: identity.subject as any,
+      rejection_reason: args.reason,
+      admin_notes: args.notes,
+      updated_at: Date.now(),
+    });
+
+    // Create rejection log
+    await ctx.db.insert("admin_moderation_logs", {
+      event_id: args.event_id,
+      admin_id: identity.subject as any,
+      admin_name: identity.name || "Admin",
+      action: "rejected",
+      previous_status: "pending",
+      new_status: "rejected",
+      decision_reason: args.reason,
+      admin_notes: args.notes,
+      is_automated_decision: false,
+      created_at: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+// ============================================================================
+// QUEUE INTEGRATION FUNCTIONS  
+// ============================================================================
+
+export const getAvailableTickets = query({
+  args: { 
+    event_id: v.id("events"),
+    ticket_category_id: v.id("ticket_categories"),
+  },
+  handler: async (ctx, args) => {
+    const category = await ctx.db.get(args.ticket_category_id);
+    if (!category) return 0;
+
+    // Count tickets sold from completed bookings
+    const bookings = await ctx.db
+      .query("bookings")
+      .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
+      .filter((q) => q.eq(q.field("status"), "completed"))
+      .collect();
+
+         let ticketsSold = 0;
+     for (const booking of bookings) {
+       for (const item of booking.ticket_items || []) {
+         if (item.ticket_category_id === args.ticket_category_id) {
+           ticketsSold += item.quantity;
+         }
+       }
+     }
+
+     // Count active reservations
+     const reservations = await ctx.db
+       .query("ticket_reservations")
+       .withIndex("by_ticket_category", (q) => q.eq("ticket_category_id", args.ticket_category_id))
+       .filter((q) => q.eq(q.field("status"), "active"))
+       .collect();
+
+     let reservedTickets = 0;
+     for (const reservation of reservations) {
+       if (reservation.expires_at > Date.now()) {
+         reservedTickets += reservation.quantity;
+       }
+     }
+
+     return Math.max(0, category.total_quantity - ticketsSold - reservedTickets);
+  },
+});
+
+export const processQueue = internalMutation({
+  args: {
+    event_id: v.id("events"),
+    ticket_category_id: v.id("ticket_categories"),
+  },
+  handler: async (ctx, args) => {
+         // Calculate available tickets directly since we can't call other functions from internalMutation
+     const category = await ctx.db.get(args.ticket_category_id);
+     if (!category) return { processed: 0 };
+
+     // Count tickets sold from completed bookings
+     const bookings = await ctx.db
+       .query("bookings")
+       .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
+       .filter((q) => q.eq(q.field("status"), "confirmed"))
+       .collect();
+
+     let ticketsSold = 0;
+     for (const booking of bookings) {
+       for (const item of booking.ticket_items || []) {
+         if (item.ticket_category_id === args.ticket_category_id) {
+           ticketsSold += item.quantity;
+         }
+       }
+     }
+
+     const availableTickets = Math.max(0, category.total_quantity - ticketsSold);
+     if (availableTickets <= 0) return { processed: 0 };
+
+     // Get next person in queue
+     const nextInQueue = await ctx.db
+       .query("waiting_list")
+       .withIndex("by_ticket_category", (q) => q.eq("ticket_category_id", args.ticket_category_id))
+       .filter((q) => q.eq(q.field("status"), "waiting"))
+       .order("asc")
+       .first();
+
+    if (!nextInQueue) return { processed: 0 };
+
+    const offerQuantity = Math.min(nextInQueue.requested_quantity, availableTickets);
+
+    // Update status to offered
+    await ctx.db.patch(nextInQueue._id, {
+      status: "offered",
+      offered_at: Date.now(),
+      offer_expires_at: Date.now() + (15 * 60 * 1000), // 15 minutes
+      offered_quantity: offerQuantity,
+      updated_at: Date.now(),
+    });
+
+    return { processed: 1, offered_quantity: offerQuantity };
+  },
+});
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+export const getModerationStats = query({
+  args: {},
+  handler: async (ctx) => {
+    const pendingCount = (await ctx.db
+      .query("events")
+      .withIndex("by_moderation_status", (q) => q.eq("moderation_status", "pending_review"))
+      .collect()).length;
+
+    const approvedCount = (await ctx.db
+      .query("events")
+      .withIndex("by_moderation_status", (q) => q.eq("moderation_status", "approved"))
+      .collect()).length;
+
+    const rejectedCount = (await ctx.db
+      .query("events")
+      .withIndex("by_moderation_status", (q) => q.eq("moderation_status", "rejected"))
+      .collect()).length;
+
+    return {
+      pending: pendingCount,
+      approved: approvedCount,
+      rejected: rejectedCount,
+      total: pendingCount + approvedCount + rejectedCount,
+    };
+  },
+});
+
+export const getFeaturedEvents = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("events")
+      .withIndex("by_featured", (q) => q.eq("is_featured", true))
+      .filter((q) => q.eq(q.field("status"), "published"))
+      .order("desc")
+      .take(6);
+  },
+});
+
+// ============================================================================
+// TICKET CATEGORIES
+// ============================================================================
+
+export const getTicketCategories = query({
+  args: { event_id: v.id("events") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("ticket_categories")
+      .withIndex("by_event", (q) => q.eq("event_id", args.event_id))
+      .order("asc")
+      .collect();
+  },
+});
+
+export const createTicketCategory = mutation({
+  args: {
+    event_id: v.id("events"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    price: v.number(),
+    currency: v.string(),
+    total_quantity: v.number(),
+    max_quantity_per_order: v.optional(v.number()),
+    sale_start_datetime: v.optional(v.number()),
+    sale_end_datetime: v.optional(v.number()),
+    sort_order: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Must be logged in to create ticket categories");
+    }
+
+    // Verify user owns this event or is organizer
+    const event = await ctx.db.get(args.event_id);
+    if (!event) {
+      throw new Error("Event not found");
+    }
+
+    const organizer = await ctx.db.get(event.organizer_id);
+    if (!organizer || organizer.user_id !== identity.subject) {
+      throw new Error("Not authorized to create ticket categories for this event");
+    }
+
+    return await ctx.db.insert("ticket_categories", {
+      ...args,
+      is_active: true,
+      sold_quantity: 0,
+      reserved_quantity: 0,
+      created_at: Date.now(),
+    });
+  },
+});
+
+export const updateTicketCategory = mutation({
+  args: {
+    category_id: v.id("ticket_categories"),
+    name: v.optional(v.string()),
+    description: v.optional(v.string()),
+    price: v.optional(v.number()),
+    total_quantity: v.optional(v.number()),
+    max_quantity_per_order: v.optional(v.number()),
+    sale_start_datetime: v.optional(v.number()),
+    sale_end_datetime: v.optional(v.number()),
+    is_active: v.optional(v.boolean()),
+    sort_order: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const { category_id, ...updates } = args;
+    
+    await ctx.db.patch(category_id, {
+      ...updates,
+      updated_at: Date.now(),
+    });
+    
+    return await ctx.db.get(category_id);
+  },
+});
+
+// ============================================================================
+// MIGRATION & SEEDING MUTATIONS
+// ============================================================================
+
+export const updateEventDatesToFuture = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const events = await ctx.db.query("events").collect();
+    const now = Date.now();
+    
+    console.log("=== UPDATING EVENT DATES TO FUTURE ===");
+    
+    // Update each event to be in the future
+    const updates = [
+      { title: "KL Marathon 2024", newDate: new Date("2025-08-15T06:00:00Z").getTime() },
+      { title: "Tech Summit Malaysia 2024", newDate: new Date("2025-07-25T09:00:00Z").getTime() },
+      { title: "Malaysia Food Festival 2024", newDate: new Date("2025-09-20T10:00:00Z").getTime() },
+      { title: "Coldplay World Tour - KL", newDate: new Date("2025-10-15T11:00:00Z").getTime() },
+      { title: "Arsenal vs Liverpool - Premier League", newDate: new Date("2025-11-08T12:30:00Z").getTime() }
+    ];
+    
+    let updatedCount = 0;
+    for (const event of events) {
+      const updateInfo = updates.find(u => u.title === event.title);
+      if (updateInfo) {
+        await ctx.db.patch(event._id, {
+          start_datetime: updateInfo.newDate,
+          updated_at: now
+        });
+        console.log(`✅ Updated ${event.title} to ${new Date(updateInfo.newDate).toLocaleString()}`);
+        updatedCount++;
+      }
+    }
+    
+    console.log(`✅ Updated ${updatedCount} events to future dates`);
+    
+    return { success: true, updatedCount };
+  },
+});
+
+export const seedOrganizer = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Check if organizer already exists
+    const existingOrganizers = await ctx.db.query("organizer_profiles").collect();
+    if (existingOrganizers.length > 0) {
+      console.log("✅ Organizer already exists");
+      return existingOrganizers[0]._id;
+    }
+    
+    // Create a system user first
+    const userId = await ctx.db.insert("users", {
+      email: "woodyz.dev@gmail.com",
+      name: "System User",
+    });
+    
+    console.log(`✅ Created system user with ID: ${userId}`);
+    
+    // Create organizer profile
+    const organizerId = await ctx.db.insert("organizer_profiles", {
+      user_id: userId,
+      business_name: "Event Management Co",
+      display_name: "Event Management Co",
+      business_type: "corporation",
+      business_address: {
+        street: "123 Main Street",
+        city: "Kuala Lumpur",
+        state_province: "Federal Territory of Kuala Lumpur",
+        country: "Malaysia",
+        postal_code: "50088"
+      },
+      verification_status: "verified",
+      subscription_tier: "pro",
+      created_at: Date.now(),
+      updated_at: Date.now(),
+    });
+    
+    console.log(`✅ Created organizer with ID: ${organizerId}`);
+    
+    // Update all existing events to use this organizer ID
+    const events = await ctx.db.query("events").collect();
+    let updatedCount = 0;
+    
+    for (const event of events) {
+      await ctx.db.patch(event._id, {
+        organizer_id: organizerId
+      });
+      updatedCount++;
+    }
+    
+    console.log(`✅ Updated ${updatedCount} events with new organizer ID`);
+    
+    return organizerId;
+  },
+});
+
+export const seedEvents = mutation({
+  args: {
+    events: v.array(v.object({
+      title: v.string(),
+      slug: v.string(),
+      description: v.string(),
+      organizer_id: v.id("organizer_profiles"),
+      start_datetime: v.number(),
+      end_datetime: v.optional(v.number()),
+      timezone: v.string(),
+      location_type: v.union(v.literal("physical"), v.literal("online"), v.literal("hybrid")),
+      featured_image_storage_id: v.optional(v.id("_storage")),
+      event_category: v.optional(v.union(
+        v.literal("sports"), v.literal("music"), v.literal("food"),
+        v.literal("travel"), v.literal("technology"), v.literal("arts"),
+        v.literal("business"), v.literal("education"), v.literal("health"),
+        v.literal("entertainment")
+      )),
+      tags: v.optional(v.array(v.string())),
+      status: v.union(
+        v.literal("draft"), v.literal("pending"), v.literal("approved"),
+        v.literal("rejected"), v.literal("published"), v.literal("cancelled"),
+        v.literal("postponed"), v.literal("sold_out"), v.literal("completed")
+      ),
+      moderation_status: v.union(
+        v.literal("not_submitted"), v.literal("pending_review"),
+        v.literal("approved"), v.literal("rejected"), v.literal("requires_changes")
+      ),
+      visibility: v.union(v.literal("public"), v.literal("private"), v.literal("unlisted")),
+      is_free: v.boolean(),
+      currency: v.optional(v.string()),
+      pricing_type: v.optional(v.union(v.literal("free"), v.literal("paid"), v.literal("donation"))),
+      max_attendees: v.optional(v.number()),
+      current_attendees: v.optional(v.number()),
+      is_featured: v.optional(v.boolean()),
+      fraud_score: v.optional(v.number()),
+      risk_factors: v.optional(v.array(v.union(
+        v.literal("new_organizer"), v.literal("high_ticket_price"), v.literal("vague_description"),
+        v.literal("suspicious_images"), v.literal("duplicate_content"), v.literal("misleading_title"),
+        v.literal("no_refund_policy"), v.literal("unrealistic_claims")
+      ))),
+      requires_manual_review: v.optional(v.boolean()),
+      view_count: v.optional(v.number()),
+      like_count: v.optional(v.number()),
+      share_count: v.optional(v.number()),
+      created_at: v.number(),
+      updated_at: v.optional(v.number()),
+      published_at: v.optional(v.number()),
+    }))
+  },
+  handler: async (ctx, args) => {
+    const eventIds: { originalIndex: number; eventId: Id<"events"> }[] = [];
+    
+    for (let i = 0; i < args.events.length; i++) {
+      const event = args.events[i];
+      const eventId = await ctx.db.insert("events", event);
+      eventIds.push({ originalIndex: i, eventId });
+    }
+    
+    console.log(`✅ Successfully seeded ${eventIds.length} events`);
+    return eventIds;
+  },
+});
+
+export const seedTicketCategories = mutation({
+  args: {
+    ticketCategories: v.array(v.object({
+      event_id: v.id("events"), // Direct event ID reference
+      name: v.string(),
+      description: v.optional(v.string()),
+      price: v.number(),
+      currency: v.string(),
+      total_quantity: v.number(),
+      sold_quantity: v.optional(v.number()),
+      reserved_quantity: v.optional(v.number()),
+      queue_enabled: v.optional(v.boolean()),
+      min_quantity_per_order: v.optional(v.number()),
+      max_quantity_per_order: v.optional(v.number()),
+      max_quantity_per_user: v.optional(v.number()),
+      sale_start_datetime: v.optional(v.number()),
+      sale_end_datetime: v.optional(v.number()),
+      is_active: v.boolean(),
+      is_hidden: v.optional(v.boolean()),
+      requires_promo_code: v.optional(v.boolean()),
+      includes_products: v.optional(v.boolean()),
+      bundled_products: v.optional(v.array(v.object({
+        product_id: v.id("products"), // Use actual product ID
+        quantity: v.number(),
+        is_required: v.boolean(),
+        included_in_price: v.boolean(),
+      }))),
+      requires_approval: v.optional(v.boolean()),
+      sort_order: v.optional(v.number()),
+      created_at: v.number(),
+      updated_at: v.optional(v.number()),
+    }))
+  },
+  handler: async (ctx, args) => {
+    const ticketCategoryIds: Id<"ticket_categories">[] = [];
+    
+    for (const category of args.ticketCategories) {
+      const ticketCategoryId = await ctx.db.insert("ticket_categories", category);
+      ticketCategoryIds.push(ticketCategoryId);
+    }
+    
+    console.log(`✅ Successfully seeded ${ticketCategoryIds.length} ticket categories`);
+    return ticketCategoryIds;
+  },
+});
+
+export const clearAllEvents = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Warning: This will delete ALL events and ticket categories
+    console.log("🚨 CLEARING ALL EVENTS AND TICKET CATEGORIES");
+    
+    // Delete all ticket categories first (due to foreign key constraints)
+    const ticketCategories = await ctx.db.query("ticket_categories").collect();
+    for (const category of ticketCategories) {
+      await ctx.db.delete(category._id);
+    }
+    
+    // Delete all events
+    const events = await ctx.db.query("events").collect();
+    for (const event of events) {
+      await ctx.db.delete(event._id);
+    }
+    
+    console.log(`🗑️ Deleted ${events.length} events and ${ticketCategories.length} ticket categories`);
+    return { deletedEvents: events.length, deletedTicketCategories: ticketCategories.length };
+  },
+});
+
+// Helper mutation to get event statistics
+export const getEventStats = query({
+  args: {},
+  handler: async (ctx) => {
+    const events = await ctx.db.query("events").collect();
+    const ticketCategories = await ctx.db.query("ticket_categories").collect();
+    
+    const stats = {
+      totalEvents: events.length,
+      totalTicketCategories: ticketCategories.length,
+      eventsByCategory: {} as Record<string, number>,
+      eventsByStatus: {} as Record<string, number>,
+      ticketCategoriesWithProducts: ticketCategories.filter(tc => tc.includes_products).length,
+    };
+    
+    // Count by category
+    events.forEach(event => {
+      const category = event.event_category || 'uncategorized';
+      stats.eventsByCategory[category] = (stats.eventsByCategory[category] || 0) + 1;
+    });
+    
+    // Count by status
+    events.forEach(event => {
+      stats.eventsByStatus[event.status] = (stats.eventsByStatus[event.status] || 0) + 1;
+    });
+    
+    return stats;
   },
 });

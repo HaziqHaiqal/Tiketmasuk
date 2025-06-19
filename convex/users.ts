@@ -1,26 +1,205 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { getAuthUserId, getAuthSessionId } from "@convex-dev/auth/server";
+
+// ============================================================================
+// CONVEX AUTH HELPERS (Following Official Documentation)
+// ============================================================================
+
+// Get current authenticated user ID using Convex Auth
+export const getCurrentUserId = query({
+  args: {},
+  handler: async (ctx) => {
+    return await getAuthUserId(ctx);
+  },
+});
+
+// Get current session ID using Convex Auth
+export const getCurrentSessionId = query({
+  args: {},
+  handler: async (ctx) => {
+    return await getAuthSessionId(ctx);
+  },
+});
+
+// Get current user document from users table
+export const getCurrentUser = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    
+    return await ctx.db.get(userId);
+  },
+});
 
 // ============================================================================
 // USER PROFILE MANAGEMENT (using Convex Auth)
 // ============================================================================
 
 // Get current user's profile information
-export const getCurrentUser = query({
+export const getCurrentUserProfile = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return null;
-    }
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
     
-    // Return the user identity from Convex Auth
+    // Get the user document from Convex Auth users table
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+    
+    // Get additional profile information
+    const profile = await ctx.db
+      .query("user_profiles")
+      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+      .first();
+    
     return {
-      id: identity.subject,
-      email: identity.email,
-      name: identity.name,
-      image: identity.pictureUrl,
+      user,
+      profile,
     };
+  },
+});
+
+// Create or update user profile
+export const upsertUserProfile = mutation({
+  args: {
+    first_name: v.optional(v.string()),
+    last_name: v.optional(v.string()),
+    display_name: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    address: v.optional(v.object({
+      street: v.optional(v.string()),
+      city: v.string(),
+      state_province: v.string(),
+      postal_code: v.optional(v.string()),
+      country: v.string(),
+    })),
+    date_of_birth: v.optional(v.number()),
+    gender: v.optional(v.union(
+      v.literal("male"), 
+      v.literal("female"), 
+      v.literal("other"), 
+      v.literal("prefer_not_to_say")
+    )),
+    language: v.optional(v.string()),
+    timezone: v.optional(v.string()),
+    currency: v.optional(v.string()),
+    marketing_opt_in: v.optional(v.boolean()),
+    push_notifications: v.optional(v.boolean()),
+    email_notifications: v.optional(v.boolean()),
+    sms_notifications: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Must be authenticated to update profile");
+    }
+
+    // Check if profile exists
+    const existingProfile = await ctx.db
+      .query("user_profiles")
+      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+      .first();
+
+    const now = Date.now();
+    const profileData = {
+      ...args,
+      user_id: userId,
+      updated_at: now,
+    };
+
+    if (existingProfile) {
+      await ctx.db.patch(existingProfile._id, profileData);
+      return existingProfile._id;
+    } else {
+      return await ctx.db.insert("user_profiles", {
+        ...profileData,
+              roles: ["customer"],
+      current_active_role: "customer" as const,
+        account_status: "active" as const,
+        verification_level: "email_verified" as const,
+        login_count: 1,
+        created_at: now,
+      });
+    }
+  },
+});
+
+    // Switch user role (customer to organizer)
+export const switchToOrganizerRole = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Must be authenticated to switch role");
+    }
+
+    const profile = await ctx.db
+      .query("user_profiles")
+      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+      .first();
+
+    if (!profile) {
+      throw new Error("User profile not found");
+    }
+
+    const updatedRoles = profile.roles.includes("organizer") 
+      ? profile.roles 
+      : [...profile.roles, "organizer" as const];
+
+    await ctx.db.patch(profile._id, {
+      roles: updatedRoles,
+      current_active_role: "organizer",
+      is_organizer: true,
+      organizer_since: profile.organizer_since || Date.now(),
+      updated_at: Date.now(),
+    });
+
+    return profile._id;
+  },
+});
+
+// Get organizer profile for current user
+export const getOrganizerProfile = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    
+    const userProfile = await ctx.db
+      .query("user_profiles")
+      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+      .first();
+    
+    if (!userProfile?.is_organizer) return null;
+    
+    return await ctx.db
+      .query("organizer_profiles")
+      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+      .first();
+  },
+});
+
+// Track user login
+export const trackUserLogin = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return;
+    
+    const profile = await ctx.db
+      .query("user_profiles")
+      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+      .first();
+    
+    if (profile) {
+      await ctx.db.patch(profile._id, {
+        last_login_at: Date.now(),
+        login_count: (profile.login_count || 0) + 1,
+        updated_at: Date.now(),
+      });
+    }
   },
 });
 
@@ -30,20 +209,29 @@ export const getCurrentUser = query({
 
 export const createOrganizerProfile = mutation({
   args: {
+    business_name: v.string(),
     display_name: v.string(),
-    full_name: v.string(),
-    store_name: v.string(),
-    business_registration: v.optional(v.string()),
-    phone: v.optional(v.string()),
-    website: v.optional(v.string()),
-    store_description: v.optional(v.string()),
-    organizer_type: v.union(
+    business_type: v.union(
       v.literal("individual"),
-      v.literal("group"),
-      v.literal("organization"),
-      v.literal("business")
+      v.literal("sole_proprietorship"), 
+      v.literal("llc"),
+      v.literal("corporation"),
+      v.literal("nonprofit"),
+      v.literal("partnership"),
+      v.literal("government")
     ),
-    primary_location: v.string(),
+    business_registration_number: v.optional(v.string()),
+    bio: v.optional(v.string()),
+    website: v.optional(v.string()),
+    business_address: v.object({
+      street: v.optional(v.string()),
+      city: v.string(),
+      state_province: v.string(),
+      postal_code: v.optional(v.string()),
+      country: v.string(),
+    }),
+    business_phone: v.optional(v.string()),
+    business_email: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -54,7 +242,7 @@ export const createOrganizerProfile = mutation({
     // Check if organizer profile already exists
     const existingProfile = await ctx.db
       .query("organizer_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", identity.subject))
+      .withIndex("by_user_id", (q) => q.eq("user_id", identity.subject as any))
       .first();
 
     if (existingProfile) {
@@ -62,54 +250,41 @@ export const createOrganizerProfile = mutation({
     }
 
     return await ctx.db.insert("organizer_profiles", {
-      user_id: identity.subject,
+      user_id: identity.subject as any,
+      business_name: args.business_name,
       display_name: args.display_name,
-      full_name: args.full_name,
-      store_name: args.store_name,
-      business_registration: args.business_registration,
-      phone: args.phone,
+      business_type: args.business_type,
+      business_registration_number: args.business_registration_number,
+      bio: args.bio,
       website: args.website,
-      store_description: args.store_description,
-      organizer_type: args.organizer_type,
-      primary_location: args.primary_location,
-      verification_status: "unverified",
-      status: "pending", // New organizers start as pending for admin approval
+      business_address: args.business_address,
+      business_phone: args.business_phone,
+      business_email: args.business_email,
+      verification_status: "pending",
+      subscription_tier: "free",
       created_at: Date.now(),
     });
   },
 });
 
-export const getOrganizerProfile = query({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return null;
-    }
-
-    return await ctx.db
-      .query("organizer_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", identity.subject))
-      .first();
-  },
-});
-
 export const updateOrganizerProfile = mutation({
   args: {
+    business_name: v.optional(v.string()),
     display_name: v.optional(v.string()),
-    full_name: v.optional(v.string()),
-    store_name: v.optional(v.string()),
-    business_registration: v.optional(v.string()),
-    phone: v.optional(v.string()),
-    website: v.optional(v.string()),
-    store_description: v.optional(v.string()),
-    organizer_type: v.optional(v.union(
+    business_type: v.optional(v.union(
       v.literal("individual"),
-      v.literal("group"),
-      v.literal("organization"),
-      v.literal("business")
+      v.literal("sole_proprietorship"), 
+      v.literal("llc"),
+      v.literal("corporation"),
+      v.literal("nonprofit"),
+      v.literal("partnership"),
+      v.literal("government")
     )),
-    primary_location: v.optional(v.string()),
+    business_registration_number: v.optional(v.string()),
+    bio: v.optional(v.string()),
+    website: v.optional(v.string()),
+    business_phone: v.optional(v.string()),
+    business_email: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -119,7 +294,7 @@ export const updateOrganizerProfile = mutation({
 
     const profile = await ctx.db
       .query("organizer_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", identity.subject))
+      .withIndex("by_user_id", (q) => q.eq("user_id", identity.subject as any))
       .first();
 
     if (!profile) {
@@ -130,120 +305,14 @@ export const updateOrganizerProfile = mutation({
       updated_at: Date.now(),
     };
 
+    if (args.business_name !== undefined) updates.business_name = args.business_name;
     if (args.display_name !== undefined) updates.display_name = args.display_name;
-    if (args.full_name !== undefined) updates.full_name = args.full_name;
-    if (args.store_name !== undefined) updates.store_name = args.store_name;
-    if (args.business_registration !== undefined) updates.business_registration = args.business_registration;
-    if (args.phone !== undefined) updates.phone = args.phone;
+    if (args.business_type !== undefined) updates.business_type = args.business_type;
+    if (args.business_registration_number !== undefined) updates.business_registration_number = args.business_registration_number;
+    if (args.bio !== undefined) updates.bio = args.bio;
     if (args.website !== undefined) updates.website = args.website;
-    if (args.store_description !== undefined) updates.store_description = args.store_description;
-    if (args.organizer_type !== undefined) updates.organizer_type = args.organizer_type;
-    if (args.primary_location !== undefined) updates.primary_location = args.primary_location;
-
-    await ctx.db.patch(profile._id, updates);
-    return await ctx.db.get(profile._id);
-  },
-});
-
-// ============================================================================
-// CUSTOMER PROFILE MANAGEMENT
-// ============================================================================
-
-export const createCustomerProfile = mutation({
-  args: {
-    full_name: v.string(),
-    phone: v.optional(v.string()),
-    date_of_birth: v.optional(v.string()),
-    gender: v.optional(v.string()),
-    country: v.optional(v.string()),
-    state: v.optional(v.string()),
-    address: v.optional(v.string()),
-    postcode: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    // Check if customer profile already exists
-    const existingProfile = await ctx.db
-      .query("customer_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", identity.subject))
-      .first();
-
-    if (existingProfile) {
-      throw new Error("Customer profile already exists");
-    }
-
-    return await ctx.db.insert("customer_profiles", {
-      user_id: identity.subject,
-      full_name: args.full_name,
-      phone: args.phone,
-      date_of_birth: args.date_of_birth,
-      gender: args.gender,
-      country: args.country,
-      state: args.state,
-      address: args.address,
-      postcode: args.postcode,
-      created_at: Date.now(),
-    });
-  },
-});
-
-export const getCustomerProfile = query({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return null;
-    }
-
-    return await ctx.db
-      .query("customer_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", identity.subject))
-      .first();
-  },
-});
-
-export const updateCustomerProfile = mutation({
-  args: {
-    full_name: v.optional(v.string()),
-    phone: v.optional(v.string()),
-    date_of_birth: v.optional(v.string()),
-    gender: v.optional(v.string()),
-    country: v.optional(v.string()),
-    state: v.optional(v.string()),
-    address: v.optional(v.string()),
-    postcode: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const profile = await ctx.db
-      .query("customer_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", identity.subject))
-      .first();
-
-    if (!profile) {
-      throw new Error("Customer profile not found");
-    }
-
-    const updates: any = {
-      updated_at: Date.now(),
-    };
-
-    if (args.full_name !== undefined) updates.full_name = args.full_name;
-    if (args.phone !== undefined) updates.phone = args.phone;
-    if (args.date_of_birth !== undefined) updates.date_of_birth = args.date_of_birth;
-    if (args.gender !== undefined) updates.gender = args.gender;
-    if (args.country !== undefined) updates.country = args.country;
-    if (args.state !== undefined) updates.state = args.state;
-    if (args.address !== undefined) updates.address = args.address;
-    if (args.postcode !== undefined) updates.postcode = args.postcode;
+    if (args.business_phone !== undefined) updates.business_phone = args.business_phone;
+    if (args.business_email !== undefined) updates.business_email = args.business_email;
 
     await ctx.db.patch(profile._id, updates);
     return await ctx.db.get(profile._id);
@@ -265,24 +334,46 @@ export const getUserRole = query({
     // Check if user has organizer profile
     const organizerProfile = await ctx.db
       .query("organizer_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", identity.subject))
+      .withIndex("by_user_id", (q) => q.eq("user_id", identity.subject as any))
       .first();
 
     if (organizerProfile) {
-      return { role: "organizer", status: organizerProfile.status };
-    }
-
-    // Check if user has customer profile
-    const customerProfile = await ctx.db
-      .query("customer_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", identity.subject))
-      .first();
-
-    if (customerProfile) {
-      return { role: "customer" };
+      return { role: "organizer", verification_status: organizerProfile.verification_status };
     }
 
     return { role: "user" }; // Basic authenticated user
+  },
+});
+
+export const current = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    
+    return await ctx.db.get(userId);
+  },
+});
+
+export const getUserProfile = query({
+  args: { user_id: v.id("users") },
+  handler: async (ctx, args) => {
+    // Get the basic user record
+    const user = await ctx.db.get(args.user_id);
+    if (!user) return null;
+
+    // Get the user profile with additional information
+    const profile = await ctx.db
+      .query("user_profiles")
+      .withIndex("by_user_id", (q) => q.eq("user_id", args.user_id))
+      .first();
+
+    return {
+      user,
+      profile,
+      email: user.email,
+      phone: profile?.phone,
+    };
   },
 });
 

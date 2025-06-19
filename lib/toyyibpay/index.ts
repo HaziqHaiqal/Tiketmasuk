@@ -42,8 +42,5 @@ export type {
   CreateBillOptions,
 } from './types';
 
-// Backward compatibility - export the client as the default export
+// Default export for convenience
 export { toyyibpayClient as default } from './client';
-
-// Legacy exports for existing code compatibility
-export { toyyibpayClient as toyyibpay } from './client'; 

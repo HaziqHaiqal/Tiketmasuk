@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -12,18 +12,16 @@ import {
   Ticket,
   Clock,
   ArrowRight,
-  Trash2,
-  ShoppingCart
+  Trash2
 } from "lucide-react";
-import { useStorageUrl } from "@/lib/utils";
-import { clearCheckoutSessionData } from "@/lib/utils";
+import { useStorageUrl, calculateFees } from "@/lib/utils";
 import Image from "next/image";
 import Spinner from "@/components/Spinner";
+import CheckoutLayout from "@/components/checkout/CheckoutLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { getMinPrice } from "@/lib/eventUtils";
+
 
 function CartContent() {
   const router = useRouter();
@@ -34,52 +32,38 @@ function CartContent() {
   const waitingListId = searchParams.get("waitingListId") as Id<"waiting_list">;
 
   const [isLoading, setIsLoading] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState("");
 
   const event = useQuery(api.events.getById, { event_id: eventId });
+  const waitingListEntry = useQuery(
+    api.waitingList.getWaitingListEntry,
+    waitingListId ? { waiting_list_id: waitingListId } : "skip"
+  );
   const queuePosition = useQuery(
     api.waitingList.getQueuePosition,
-    isAuthenticated ? {
+    isAuthenticated && eventId && waitingListEntry?.ticket_category_id ? {
       event_id: eventId,
-      user_id: "", // Will be handled by the backend using ctx.auth
+      ticket_category_id: waitingListEntry.ticket_category_id,
     } : "skip"
   );
+  const ticketCategories = useQuery(
+    api.events.getTicketCategories,
+    eventId ? { event_id: eventId } : "skip"
+  );
   
-  const imageUrl = useStorageUrl(event?.image_storage_id);
+  const imageUrl = useStorageUrl(event?.featured_image_storage_id);
+
+  // Get the specific ticket category for this queue entry
+  const ticketCategory = ticketCategories?.find(cat => cat._id === waitingListEntry?.ticket_category_id);
 
   // Calculate offer validity
   const hasValidOffer = queuePosition?.status === "offered";
   const offerExpiresAt = queuePosition?.offer_expires_at ?? 0;
   const isExpired = Date.now() > offerExpiresAt;
 
-  useEffect(() => {
-    if (!hasValidOffer || isExpired) return;
-
-    const calculateTimeRemaining = () => {
-      const diff = offerExpiresAt - Date.now();
-      if (diff <= 0) {
-        setTimeRemaining("Expired");
-        // Clear all session storage data when timer reaches zero
-        clearCheckoutSessionData();
-        // Redirect when timer reaches zero
-        router.push(`/event/${eventId}`);
-        return;
-      }
-
-      const minutes = Math.floor(diff / 1000 / 60);
-      const seconds = Math.floor((diff / 1000) % 60);
-
-      if (minutes > 0) {
-        setTimeRemaining(`${minutes}m ${seconds}s`);
-      } else {
-        setTimeRemaining(`${seconds}s`);
-      }
-    };
-
-    calculateTimeRemaining();
-    const interval = setInterval(calculateTimeRemaining, 1000);
-    return () => clearInterval(interval);
-  }, [offerExpiresAt, hasValidOffer, isExpired, eventId, router]);
+  // Calculate pricing with fees
+  const subtotal = ((ticketCategory?.price || 0) * (queuePosition?.requested_quantity || 0));
+  const fees = calculateFees(subtotal);
+  const totalAmount = fees.total;
 
   const handleProceedToDetails = () => {
     if (!event) return;
@@ -118,59 +102,14 @@ function CartContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <ShoppingCart className="w-8 h-8 text-blue-600" />
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Your Cart</h1>
-          </div>
-          <p className="text-gray-600 text-lg">
-            Review your ticket selection before proceeding to checkout
-          </p>
-          {hasValidOffer && (
-            <Badge variant="secondary" className="mt-3 bg-blue-100 text-blue-800 hover:bg-blue-100">
-              <Clock className="w-3 h-3 mr-1" />
-              Reserved • Expires in {timeRemaining}
-            </Badge>
-          )}
-        </div>
-
-        {/* Progress Indicator */}
-        <Card className="mb-8">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex flex-col items-center">
-                <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium mb-2">
-                  1
-                </div>
-                <span className="text-sm font-medium text-blue-600">Cart</span>
-              </div>
-              <div className="flex-1 h-0.5 bg-gray-200 mx-4"></div>
-              <div className="flex flex-col items-center">
-                <div className="w-10 h-10 bg-gray-200 text-gray-400 rounded-full flex items-center justify-center text-sm font-medium mb-2">
-                  2
-                </div>
-                <span className="text-sm font-medium text-gray-400">Details</span>
-              </div>
-              <div className="flex-1 h-0.5 bg-gray-200 mx-4"></div>
-              <div className="flex flex-col items-center">
-                <div className="w-10 h-10 bg-gray-200 text-gray-400 rounded-full flex items-center justify-center text-sm font-medium mb-2">
-                  3
-                </div>
-                <span className="text-sm font-medium text-gray-400">Summary</span>
-              </div>
-              <div className="flex-1 h-0.5 bg-gray-200 mx-4"></div>
-              <div className="flex flex-col items-center">
-                <div className="w-10 h-10 bg-gray-200 text-gray-400 rounded-full flex items-center justify-center text-sm font-medium mb-2">
-                  4
-                </div>
-                <span className="text-sm font-medium text-gray-400">Payment</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+    <CheckoutLayout
+      currentStep={1}
+      offerExpiresAt={offerExpiresAt}
+      hasValidOffer={hasValidOffer}
+      redirectPath={`/event/${eventId}`}
+      title="Your Cart"
+      description="Review your ticket selection before proceeding to checkout"
+    >
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Cart Items */}
@@ -193,7 +132,7 @@ function CartContent() {
                       <div className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0">
                         <Image
                           src={imageUrl}
-                          alt={event.name}
+                          alt={event.title}
                           width={96}
                           height={96}
                           className="w-full h-full object-cover"
@@ -201,19 +140,19 @@ function CartContent() {
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-lg text-gray-900 mb-2">{event.name}</h3>
+                      <h3 className="font-semibold text-lg text-gray-900 mb-2">{event.title}</h3>
                       <div className="space-y-1 text-sm text-gray-600">
                         <div className="flex items-center gap-2">
                           <Calendar className="w-4 h-4" />
-                          <span>{new Date(event.event_date).toLocaleDateString()}</span>
+                          <span>{new Date(event.start_datetime).toLocaleDateString()}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Clock className="w-4 h-4" />
-                          <span>{new Date(event.event_date).toLocaleTimeString()}</span>
+                          <span>{new Date(event.start_datetime).toLocaleTimeString()}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <MapPin className="w-4 h-4" />
-                          <span className="truncate">{event.location}</span>
+                          <span className="truncate">Event Location</span>
                         </div>
                       </div>
                     </div>
@@ -225,12 +164,12 @@ function CartContent() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="font-medium text-gray-900">General Admission</h4>
-                        <p className="text-sm text-gray-600">Standard entry ticket</p>
+                        <h4 className="font-medium text-gray-900">{ticketCategory?.name || "General Admission"}</h4>
+                        <p className="text-sm text-gray-600">{ticketCategory?.description || "Standard entry ticket"}</p>
                       </div>
                       <div className="text-right">
-                        <div className="font-semibold text-lg text-gray-900">RM {((getMinPrice(event) / 100) * queuePosition.quantity).toFixed(2)}</div>
-                        <div className="text-sm text-gray-600">Qty: {queuePosition.quantity}</div>
+                        <div className="font-semibold text-lg text-gray-900">RM {(((ticketCategory?.price || 0) / 100) * queuePosition.requested_quantity).toFixed(2)}</div>
+                        <div className="text-sm text-gray-600">Qty: {queuePosition.requested_quantity}</div>
                       </div>
                     </div>
                   </div>
@@ -262,19 +201,19 @@ function CartContent() {
               <CardContent className="space-y-6">
                 {/* Event Summary */}
                 <div>
-                  <h4 className="font-semibold text-base mb-3">{event.name}</h4>
+                  <h4 className="font-semibold text-base mb-3">{event.title}</h4>
                   <div className="space-y-2 text-sm text-gray-600">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
-                      <span>{new Date(event.event_date).toLocaleDateString()}</span>
+                      <span>{new Date(event.start_datetime).toLocaleDateString()}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4" />
-                      <span>{new Date(event.event_date).toLocaleTimeString()}</span>
+                      <span>{new Date(event.start_datetime).toLocaleTimeString()}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4" />
-                      <span>{event.location}</span>
+                      <span>Event Location</span>
                     </div>
                   </div>
                 </div>
@@ -282,31 +221,27 @@ function CartContent() {
                 <Separator />
 
                 {/* Price Breakdown */}
-                                  <div className="space-y-3">
-                    <div className="flex justify-between text-sm">
-                      <span>Ticket × {queuePosition.quantity}</span>
-                      <span>RM {((getMinPrice(event) / 100) * queuePosition.quantity).toFixed(2)}</span>
-                    </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span>Ticket × {queuePosition.requested_quantity}</span>
+                    <span>RM {(subtotal / 100).toFixed(2)}</span>
+                  </div>
                   <div className="flex justify-between text-sm">
                     <span>Service Fee</span>
-                    <span>RM 0.00</span>
+                    <span>RM {(fees.serviceFee / 100).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Processing Fee</span>
+                    <span>RM {(fees.processingFee / 100).toFixed(2)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-semibold">
                     <span>Total</span>
-                    <span>RM {((getMinPrice(event) / 100) * queuePosition.quantity).toFixed(2)}</span>
+                    <span>RM {(totalAmount / 100).toFixed(2)}</span>
                   </div>
                 </div>
 
                 <Separator />
-
-                {/* Countdown Timer */}
-                {hasValidOffer && !isExpired && (
-                  <div className="bg-red-50 p-3 rounded-lg text-center border border-red-200">
-                    <div className="text-sm text-red-700 mb-1">Queue expires in</div>
-                    <div className="text-lg font-bold text-red-900">{timeRemaining}</div>
-                  </div>
-                )}
 
                 {/* Security Notice */}
                 {/* <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
@@ -356,10 +291,9 @@ function CartContent() {
             </Card>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
+      </CheckoutLayout>
+    );
+  }
 
 export default function CartPage() {
   return (

@@ -2,287 +2,274 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 
-// Create organizer profile
-export const createOrganizerProfile = mutation({
+// ============================================================================
+// ORGANIZER PROFILE MANAGEMENT
+// ============================================================================
+
+export const createProfile = mutation({
   args: {
-    user_id: v.string(),
-    display_name: v.string(),
-    full_name: v.string(),
-    email: v.string(),
-    phone: v.string(),
-    store_name: v.string(),
-    store_description: v.optional(v.string()),
-    organizer_type: v.union(
+    business_name: v.string(),
+    business_type: v.union(
       v.literal("individual"),
-      v.literal("group"),
-      v.literal("organization"),
-      v.literal("business")
+      v.literal("sole_proprietorship"), 
+      v.literal("llc"),
+      v.literal("corporation"),
+      v.literal("nonprofit"),
+      v.literal("partnership"),
+      v.literal("government")
     ),
-    primary_location: v.string(),
-    website: v.optional(v.string()),
-    business_name: v.optional(v.string()),
-    business_registration: v.optional(v.string()),
+    display_name: v.string(),
+    business_address: v.object({
+      street: v.optional(v.string()),
+      city: v.string(),
+      state_province: v.string(),
+      postal_code: v.optional(v.string()),
+      country: v.string(),
+    }),
   },
   handler: async (ctx, args) => {
-    const organizerId = await ctx.db.insert("organizer_profiles", {
-      ...args,
-      verification_status: "unverified",
-      status: "active",
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Must be authenticated to create organizer profile");
+    }
+
+    return await ctx.db.insert("organizer_profiles", {
+      user_id: identity.subject as any,
+      business_name: args.business_name,
+      business_type: args.business_type,
+      display_name: args.display_name,
+      business_address: args.business_address,
+      verification_status: "pending",
+      subscription_tier: "free",
       created_at: Date.now(),
     });
-    
-    return organizerId;
   },
 });
 
-// Get organizer profile by user ID
-export const getOrganizerByUserId = query({
+export const getByUserId = query({
   args: { user_id: v.string() },
-  handler: async (ctx, { user_id }) => {
+  handler: async (ctx, args) => {
     return await ctx.db
       .query("organizer_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", user_id))
+      .withIndex("by_user_id", (q) => q.eq("user_id", args.user_id as any))
       .first();
   },
 });
 
-// Get organizer profile by ID
-export const getOrganizerById = query({
-  args: { organizer_id: v.id("organizer_profiles") },
-  handler: async (ctx, { organizer_id }) => {
-    return await ctx.db.get(organizer_id);
-  },
-});
-
-// Update organizer profile
-export const updateOrganizerProfile = mutation({
+export const updateProfile = mutation({
   args: {
-    organizer_id: v.id("organizer_profiles"),
-    display_name: v.optional(v.string()),
-    full_name: v.optional(v.string()),
-    email: v.optional(v.string()),
-    phone: v.optional(v.string()),
-    store_name: v.optional(v.string()),
-    store_description: v.optional(v.string()),
-    organizer_type: v.optional(v.union(
-      v.literal("individual"),
-      v.literal("group"),
-      v.literal("organization"),
-      v.literal("business")
-    )),
-    primary_location: v.optional(v.string()),
-    website: v.optional(v.string()),
+    profile_id: v.id("organizer_profiles"),
     business_name: v.optional(v.string()),
-    business_registration: v.optional(v.string()),
+    display_name: v.optional(v.string()),
+    bio: v.optional(v.string()),
+    website: v.optional(v.string()),
+    business_phone: v.optional(v.string()),
+    business_email: v.optional(v.string()),
   },
-  handler: async (ctx, { organizer_id, ...updates }) => {
-    await ctx.db.patch(organizer_id, {
+  handler: async (ctx, args) => {
+    const { profile_id, ...updates } = args;
+    
+    await ctx.db.patch(profile_id, {
       ...updates,
       updated_at: Date.now(),
     });
+
+    return await ctx.db.get(profile_id);
   },
 });
 
-// Update organizer images
 export const updateImages = mutation({
   args: {
-    organizerId: v.id("organizer_profiles"),
-    images: v.object({
-      profileImage: v.optional(v.string()),
-      storeLogo: v.optional(v.string()),
-      storeBanner: v.optional(v.string()),
-    }),
+    profile_id: v.id("organizer_profiles"),
+    logo_storage_id: v.optional(v.id("_storage")),
+    banner_storage_id: v.optional(v.id("_storage")),
   },
-  handler: async (ctx, { organizerId, images }) => {
-    const updates: any = {
-      updated_at: Date.now(),
-    };
-
-    // Update storage IDs
-    if (images.profileImage) {
-      updates.profile_image_storage_id = images.profileImage;
-    }
-    if (images.storeLogo) {
-      updates.store_logo_storage_id = images.storeLogo;
-    }
-    if (images.storeBanner) {
-      updates.store_banner_storage_id = images.storeBanner;
-    }
-
-    await ctx.db.patch(organizerId, updates);
-  },
-});
-
-// Delete organizer image
-export const deleteImage = mutation({
-  args: {
-    organizerId: v.id("organizer_profiles"),
-    imageType: v.union(
-      v.literal("profileImage"),
-      v.literal("storeLogo"),
-      v.literal("storeBanner")
-    ),
-  },
-  handler: async (ctx, { organizerId, imageType }) => {
-    const organizer = await ctx.db.get(organizerId);
+  handler: async (ctx, args) => {
+    const { profile_id, ...imageUpdates } = args;
+    const organizer = await ctx.db.get(profile_id);
+    
     if (!organizer) {
-      throw new Error("Organizer not found");
+      throw new Error("Organizer profile not found");
     }
 
-    const updates: any = {
-      updated_at: Date.now(),
-    };
-
+    // Clean up old images if replacing
     let storageIdToDelete: Id<"_storage"> | undefined;
-
-    // Determine which image to delete
-    switch (imageType) {
-      case "profileImage":
-        storageIdToDelete = organizer.profile_image_storage_id;
-        updates.profile_image_storage_id = undefined;
-        break;
-      case "storeLogo":
-        storageIdToDelete = organizer.store_logo_storage_id;
-        updates.store_logo_storage_id = undefined;
-        break;
-      case "storeBanner":
-        storageIdToDelete = organizer.store_banner_storage_id;
-        updates.store_banner_storage_id = undefined;
-        break;
+    
+    if (imageUpdates.logo_storage_id && organizer.logo_storage_id) {
+      storageIdToDelete = organizer.logo_storage_id;
+    }
+    
+    if (imageUpdates.banner_storage_id && organizer.banner_storage_id) {
+      storageIdToDelete = organizer.banner_storage_id;
     }
 
-    // Delete from storage if exists
+    // Update the profile
+    await ctx.db.patch(profile_id, {
+      ...imageUpdates,
+      updated_at: Date.now(),
+    });
+
+    // Delete old image if needed
     if (storageIdToDelete) {
       await ctx.storage.delete(storageIdToDelete);
     }
 
-    // Update database
-    await ctx.db.patch(organizerId, updates);
+    return await ctx.db.get(profile_id);
   },
 });
 
-// Get organizer with image URLs
-export const getOrganizerWithImages = query({
+export const getProfileWithImages = query({
   args: { organizer_id: v.id("organizer_profiles") },
-  handler: async (ctx, { organizer_id }) => {
-    const organizer = await ctx.db.get(organizer_id);
-    if (!organizer) {
-      return null;
-    }
+  handler: async (ctx, args) => {
+    const organizer = await ctx.db.get(args.organizer_id);
+    if (!organizer) return null;
 
     // Get image URLs
-    const profileImageUrl = organizer.profile_image_storage_id
-      ? await ctx.storage.getUrl(organizer.profile_image_storage_id)
-      : undefined;
-    
-    const storeLogoUrl = organizer.store_logo_storage_id
-      ? await ctx.storage.getUrl(organizer.store_logo_storage_id)
-      : undefined;
-    
-    const storeBannerUrl = organizer.store_banner_storage_id
-      ? await ctx.storage.getUrl(organizer.store_banner_storage_id)
-      : undefined;
+    const logoUrl = organizer.logo_storage_id
+      ? await ctx.storage.getUrl(organizer.logo_storage_id)
+      : null;
+
+    const bannerUrl = organizer.banner_storage_id
+      ? await ctx.storage.getUrl(organizer.banner_storage_id)
+      : null;
 
     return {
       ...organizer,
-      profileImageUrl,
-      storeLogoUrl,
-      storeBannerUrl,
+      logo_url: logoUrl,
+      banner_url: bannerUrl,
     };
   },
 });
 
-// List all organizers (for admin)
-export const listOrganizers = query({
+export const getByStatus = query({
   args: {
-    status: v.optional(v.union(
-      v.literal("active"),
-      v.literal("suspended"),
-      v.literal("banned")
-    )),
-    verification_status: v.optional(v.union(
-      v.literal("unverified"),
-      v.literal("pending"),
-      v.literal("verified"),
-      v.literal("premium")
-    )),
-    limit: v.optional(v.number()),
+    status: v.union(v.literal("pending"), v.literal("verified"), v.literal("rejected"))
   },
-  handler: async (ctx, { status, verification_status, limit = 50 }) => {
-    if (status) {
-      return await ctx.db
-        .query("organizer_profiles")
-        .withIndex("by_status", (q) => q.eq("status", status))
-        .take(limit);
-    } else if (verification_status) {
-      return await ctx.db
-        .query("organizer_profiles")
-        .withIndex("by_verification_status", (q) => 
-          q.eq("verification_status", verification_status)
-        )
-        .take(limit);
-    } else {
-      return await ctx.db
-        .query("organizer_profiles")
-        .take(limit);
-    }
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("organizer_profiles")
+      .withIndex("by_status", (q) => q.eq("verification_status", args.status))
+      .collect();
   },
 });
 
-// Update organizer status (for admin)
-export const updateOrganizerStatus = mutation({
-  args: {
-    organizer_id: v.id("organizer_profiles"),
-    status: v.union(
-      v.literal("active"),
-      v.literal("suspended"),
-      v.literal("banned")
-    ),
-    verification_status: v.optional(v.union(
-      v.literal("unverified"),
-      v.literal("pending"),
-      v.literal("verified"),
-      v.literal("premium")
-    )),
-  },
-  handler: async (ctx, { organizer_id, status, verification_status }) => {
-    const updates: any = {
-      status,
-      updated_at: Date.now(),
-    };
-
-    if (verification_status) {
-      updates.verification_status = verification_status;
-    }
-
-    await ctx.db.patch(organizer_id, updates);
-  },
-});
-
-// Update organizer statistics
-export const updateStats = mutation({
-  args: {
-    organizer_id: v.id("organizer_profiles"),
-    stats: v.object({
-      total_events: v.optional(v.number()),
-      total_tickets_sold: v.optional(v.number()),
-      total_revenue: v.optional(v.number()),
-      average_rating: v.optional(v.number()),
-      total_reviews: v.optional(v.number()),
-    }),
-  },
-  handler: async (ctx, { organizer_id, stats }) => {
-    const organizer = await ctx.db.get(organizer_id);
-    if (!organizer) {
-      throw new Error("Organizer not found");
-    }
-
-    const currentStats = organizer.stats || {};
-    const updatedStats = { ...currentStats, ...stats };
-
-    await ctx.db.patch(organizer_id, {
-      stats: updatedStats,
+export const approveProfile = mutation({
+  args: { profile_id: v.id("organizer_profiles") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.profile_id, {
+      verification_status: "verified",
       updated_at: Date.now(),
     });
+
+    return await ctx.db.get(args.profile_id);
+  },
+});
+
+export const rejectProfile = mutation({
+  args: { 
+    profile_id: v.id("organizer_profiles"),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.profile_id, {
+      verification_status: "rejected",
+      updated_at: Date.now(),
+    });
+
+    return await ctx.db.get(args.profile_id);
+  },
+});
+
+export const getAll = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("organizer_profiles").collect();
+  },
+});
+
+export const updateSubscription = mutation({
+  args: {
+    profile_id: v.id("organizer_profiles"),
+    subscription_tier: v.union(
+      v.literal("free"),
+      v.literal("basic"), 
+      v.literal("pro"),
+      v.literal("enterprise")
+    ),
+    subscription_expires_at: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const { profile_id, ...updates } = args;
+    
+    await ctx.db.patch(profile_id, {
+      ...updates,
+      updated_at: Date.now(),
+    });
+
+    return await ctx.db.get(profile_id);
+  },
+});
+
+export const updateMetrics = mutation({
+  args: {
+    organizer_id: v.id("organizer_profiles"),
+    total_events_hosted: v.optional(v.number()),
+    total_tickets_sold: v.optional(v.number()),
+    total_revenue: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const { organizer_id, ...metrics } = args;
+    
+    await ctx.db.patch(organizer_id, {
+      ...metrics,
+      updated_at: Date.now(),
+    });
+
+    return await ctx.db.get(organizer_id);
+  },
+});
+
+export const deleteImage = mutation({
+  args: {
+    profile_id: v.id("organizer_profiles"),
+    image_type: v.union(v.literal("logo"), v.literal("banner")),
+  },
+  handler: async (ctx, args) => {
+    const organizer = await ctx.db.get(args.profile_id);
+    if (!organizer) {
+      throw new Error("Organizer profile not found");
+    }
+
+    let storageIdToDelete: Id<"_storage"> | undefined;
+    const updates: Record<string, any> = { updated_at: Date.now() };
+
+    if (args.image_type === "logo" && organizer.logo_storage_id) {
+      storageIdToDelete = organizer.logo_storage_id;
+      updates.logo_storage_id = undefined;
+    } else if (args.image_type === "banner" && organizer.banner_storage_id) {
+      storageIdToDelete = organizer.banner_storage_id;
+      updates.banner_storage_id = undefined;
+    }
+
+    if (storageIdToDelete) {
+      // Delete from storage
+      await ctx.storage.delete(storageIdToDelete);
+      
+      // Update profile to remove storage reference
+      await ctx.db.patch(args.profile_id, updates);
+    }
+
+    return await ctx.db.get(args.profile_id);
+  },
+});
+
+// Query to get all verified organizers for public listing
+export const getVerifiedOrganizers = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("organizer_profiles")
+      .withIndex("by_status", (q) => q.eq("verification_status", "verified"))
+      .collect();
   },
 }); 

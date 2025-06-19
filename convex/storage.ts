@@ -16,7 +16,7 @@ export const updateEventImage = mutation({
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.event_id, {
-      image_storage_id: args.storage_id,
+      featured_image_storage_id: args.storage_id,
       updated_at: Date.now(),
     });
   },

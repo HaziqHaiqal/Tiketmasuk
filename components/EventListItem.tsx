@@ -14,8 +14,8 @@ interface EventListItemProps {
 }
 
 export default function EventListItem({ event }: EventListItemProps) {
-  const imageUrl = useStorageUrl(event.image_storage_id);
-  const isPastEvent = event.event_date < Date.now();
+  const imageUrl = useStorageUrl(event.featured_image_storage_id);
+  const isPastEvent = event.start_datetime < Date.now();
 
   return (
     <div className="bg-white rounded-lg shadow-md border overflow-hidden">
@@ -25,7 +25,7 @@ export default function EventListItem({ event }: EventListItemProps) {
           {imageUrl ? (
             <Image
               src={imageUrl}
-              alt={event.name}
+              alt={event.title}
               width={128}
               height={128}
               className="w-full h-full object-cover"
@@ -42,11 +42,11 @@ export default function EventListItem({ event }: EventListItemProps) {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <h3 className="text-lg font-semibold">{event.name}</h3>
-                {event.is_cancelled && (
+                <h3 className="text-lg font-semibold">{event.title}</h3>
+                {event.status === "cancelled" && (
                   <Badge variant="destructive">Cancelled</Badge>
                 )}
-                {!event.is_published && (
+                {event.status === "draft" && (
                   <Badge variant="secondary">Draft</Badge>
                 )}
               </div>
@@ -55,18 +55,20 @@ export default function EventListItem({ event }: EventListItemProps) {
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
                   <span>
-                    {new Date(event.event_date).toLocaleDateString()}
+                    {new Date(event.start_datetime).toLocaleDateString()}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4" />
                   <span>
-                    {new Date(event.event_date).toLocaleTimeString()}
+                    {new Date(event.start_datetime).toLocaleTimeString()}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4" />
-                  <span>{getTotalTickets(event)} tickets available</span>
+                  <span>
+                    {event.max_attendees ? `${event.current_attendees || 0} / ${event.max_attendees} attendees` : "No limit"}
+                  </span>
                 </div>
               </div>
               
@@ -78,13 +80,13 @@ export default function EventListItem({ event }: EventListItemProps) {
             {/* Actions */}
             <div className="flex items-center gap-2 ml-4">
               <Link
-                href={`/organiser/events/${event._id}/edit`}
+                href={`/dashboard/organizer/events/${event._id}/edit`}
                 className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
               >
                 <Edit className="w-4 h-4" />
               </Link>
               
-              {!isPastEvent && !event.is_cancelled && (
+              {!isPastEvent && event.status !== "cancelled" && (
                 <CancelEventButton 
                   eventId={event._id}
                 />

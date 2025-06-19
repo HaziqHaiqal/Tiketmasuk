@@ -8,19 +8,22 @@
  * @module
  */
 
+import type * as accessibility from "../accessibility.js";
+import type * as advancedTicketing from "../advancedTicketing.js";
 import type * as auth from "../auth.js";
 import type * as bookings from "../bookings.js";
 import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
 import type * as eventHelpers from "../eventHelpers.js";
+import type * as eventTemplates from "../eventTemplates.js";
 import type * as events from "../events.js";
 import type * as http from "../http.js";
+import type * as mobileApp from "../mobileApp.js";
 import type * as organizers from "../organizers.js";
-import type * as payments from "../payments.js";
 import type * as products from "../products.js";
 import type * as promoCodes from "../promoCodes.js";
+import type * as socialFeatures from "../socialFeatures.js";
 import type * as storage from "../storage.js";
-import type * as tickets from "../tickets.js";
 import type * as users from "../users.js";
 import type * as waitingList from "../waitingList.js";
 
@@ -39,19 +42,22 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  accessibility: typeof accessibility;
+  advancedTicketing: typeof advancedTicketing;
   auth: typeof auth;
   bookings: typeof bookings;
   constants: typeof constants;
   crons: typeof crons;
   eventHelpers: typeof eventHelpers;
+  eventTemplates: typeof eventTemplates;
   events: typeof events;
   http: typeof http;
+  mobileApp: typeof mobileApp;
   organizers: typeof organizers;
-  payments: typeof payments;
   products: typeof products;
   promoCodes: typeof promoCodes;
+  socialFeatures: typeof socialFeatures;
   storage: typeof storage;
-  tickets: typeof tickets;
   users: typeof users;
   waitingList: typeof waitingList;
 }>;
