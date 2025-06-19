@@ -74,6 +74,16 @@ const Header = () => {
               Organizers
             </Link>
             <Link 
+              href="/products" 
+              className={`transition-colors ${
+                isActive("/products") 
+                  ? "text-blue-600 font-medium border-b-2 border-blue-600" 
+                  : "text-gray-700 hover:text-blue-600"
+              }`}
+            >
+              Products
+            </Link>
+            <Link 
               href="/about" 
               className={`transition-colors ${
                 isActive("/about") 

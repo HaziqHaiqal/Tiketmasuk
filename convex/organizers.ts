@@ -272,4 +272,70 @@ export const getVerifiedOrganizers = query({
       .withIndex("by_status", (q) => q.eq("verification_status", "verified"))
       .collect();
   },
+});
+
+// Get organizer profile with live event counts and images
+export const getProfileWithStats = query({
+  args: { organizer_id: v.id("organizer_profiles") },
+  handler: async (ctx, args) => {
+    const organizer = await ctx.db.get(args.organizer_id);
+    if (!organizer) return null;
+
+    // Get live event count
+    const events = await ctx.db
+      .query("events")
+      .withIndex("by_organizer", (q) => q.eq("organizer_id", args.organizer_id))
+      .collect();
+
+    const now = Date.now();
+    const upcomingEvents = events.filter(event => event.start_datetime > now);
+    const pastEvents = events.filter(event => event.start_datetime <= now);
+
+    // Get image URLs
+    const logoUrl = organizer.logo_storage_id
+      ? await ctx.storage.getUrl(organizer.logo_storage_id)
+      : null;
+
+    const bannerUrl = organizer.banner_storage_id
+      ? await ctx.storage.getUrl(organizer.banner_storage_id)
+      : null;
+
+    return {
+      ...organizer,
+      logo_url: logoUrl,
+      banner_url: bannerUrl,
+      // Live stats
+      live_total_events: events.length,
+      live_upcoming_events: upcomingEvents.length,
+      live_past_events: pastEvents.length,
+    };
+  },
+});
+
+// Get all verified organizers with live event counts
+export const getVerifiedOrganizersWithStats = query({
+  args: {},
+  handler: async (ctx) => {
+    const organizers = await ctx.db
+      .query("organizer_profiles")
+      .withIndex("by_status", (q) => q.eq("verification_status", "verified"))
+      .collect();
+
+    // Get event counts for all organizers in parallel
+    const organizersWithStats = await Promise.all(
+      organizers.map(async (organizer) => {
+        const events = await ctx.db
+          .query("events")
+          .withIndex("by_organizer", (q) => q.eq("organizer_id", organizer._id))
+          .collect();
+
+        return {
+          ...organizer,
+          live_total_events: events.length,
+        };
+      })
+    );
+
+    return organizersWithStats;
+  },
 }); 

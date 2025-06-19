@@ -12,8 +12,12 @@ import { useStorageUrl } from "@/lib/utils";
 import { Doc } from "@/convex/_generated/dataModel";
 import Spinner from "@/components/Spinner";
 
+type OrganizerWithStats = Doc<"organizer_profiles"> & {
+  live_total_events: number;
+};
+
 export default function OrganizersPage() {
-  const organizers = useQuery(api.organizers.getVerifiedOrganizers);
+  const organizers = useQuery(api.organizers.getVerifiedOrganizersWithStats);
 
   if (organizers === undefined) {
     return <Spinner fullScreen />;
@@ -63,7 +67,7 @@ export default function OrganizersPage() {
 
 // Individual Organizer Card Component
 interface OrganizerCardProps {
-  organizer: Doc<"organizer_profiles">;
+  organizer: OrganizerWithStats;
 }
 
 function OrganizerCard({ organizer }: OrganizerCardProps) {
@@ -130,7 +134,7 @@ function OrganizerCard({ organizer }: OrganizerCardProps) {
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div className="flex items-center text-gray-600">
             <Calendar className="w-4 h-4 mr-2 text-blue-500" />
-            <span>{organizer.total_events_hosted || 0} Events</span>
+            <span>{organizer.live_total_events || 0} Events</span>
           </div>
           <div className="flex items-center text-gray-600">
             <Star className="w-4 h-4 mr-2 text-yellow-500" />
@@ -165,7 +169,7 @@ function OrganizerCard({ organizer }: OrganizerCardProps) {
         )}
         
         {/* View Profile Button */}
-        <Link href={`/organizer/${organizer._id}`} className="block">
+        <Link href={`/organizers/${organizer._id}`} className="block">
           <Button className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white">
             View Profile & Events
           </Button>

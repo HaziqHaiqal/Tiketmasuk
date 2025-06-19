@@ -3,12 +3,11 @@
 import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { CheckCircle, XCircle, Clock, Mail, Ticket, Home } from "lucide-react";
 import Spinner from "@/components/Spinner";
 
-
-export default function PaymentAcknowledgementPage() {
+function PaymentAcknowledgementContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
@@ -72,7 +71,7 @@ export default function PaymentAcknowledgementPage() {
             </div>
           )}
           <button
-            onClick={() => router.push("/")}
+            onClick={() => router.push("/events")}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
           >
             Back to Events
@@ -175,7 +174,7 @@ export default function PaymentAcknowledgementPage() {
             </button>
             
             <button
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/events")}
               className="flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
             >
               <Home className="w-5 h-5" />
@@ -252,7 +251,7 @@ export default function PaymentAcknowledgementPage() {
             </button>
             
             <button
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/events")}
               className="flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
             >
               <Home className="w-5 h-5" />
@@ -284,4 +283,12 @@ export default function PaymentAcknowledgementPage() {
       </div>
     </div>
   );
-} 
+}
+
+export default function PaymentAcknowledgementPage() {
+  return (
+    <Suspense fallback={<Spinner fullScreen />}>
+      <PaymentAcknowledgementContent />
+    </Suspense>
+  );
+}

@@ -872,3 +872,37 @@ export const getEventStats = query({
     return stats;
   },
 });
+
+// Get all events for migration scripts
+export const getAll = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("events").collect();
+  },
+});
+
+// Update event location data
+export const updateLocation = mutation({
+  args: {
+    eventId: v.id("events"),
+    state: v.optional(v.union(
+      v.literal("Johor"), v.literal("Kedah"), v.literal("Kelantan"), v.literal("Melaka"),
+      v.literal("Negeri Sembilan"), v.literal("Pahang"), v.literal("Penang"), v.literal("Perak"),
+      v.literal("Perlis"), v.literal("Sabah"), v.literal("Sarawak"), v.literal("Selangor"),
+      v.literal("Terengganu"), v.literal("Kuala Lumpur"), v.literal("Labuan"), v.literal("Putrajaya")
+    )),
+    city: v.optional(v.string()),
+    venue_name: v.optional(v.string()),
+    full_address: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { eventId, ...locationData } = args;
+    
+    await ctx.db.patch(eventId, {
+      ...locationData,
+      updated_at: Date.now(),
+    });
+    
+    return await ctx.db.get(eventId);
+  },
+});

@@ -52,7 +52,68 @@ export default function EventCard({ eventId }: { eventId: Id<"events"> }) {
   const getLocationDisplay = () => {
     if (event.location_type === "online") return "Online Event";
     if (event.location_type === "hybrid") return "Hybrid Event";
+    
+    // For physical events, show actual location if available
+    if (event.state && event.city) {
+      return `${event.city}, ${event.state}`;
+    }
+    
     return "Physical Event";
+  };
+
+  const getCategoryStyle = (category: string) => {
+    const categoryStyles: Record<string, string> = {
+      // Music & Entertainment
+      'music': 'bg-purple-100 text-purple-800 border-purple-200',
+      'concert': 'bg-purple-100 text-purple-800 border-purple-200',
+      'festival': 'bg-pink-100 text-pink-800 border-pink-200',
+      'party': 'bg-pink-100 text-pink-800 border-pink-200',
+      
+      // Business & Professional
+      'business': 'bg-blue-100 text-blue-800 border-blue-200',
+      'conference': 'bg-blue-100 text-blue-800 border-blue-200',
+      'workshop': 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      'seminar': 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      'networking': 'bg-cyan-100 text-cyan-800 border-cyan-200',
+      
+      // Education & Learning
+      'education': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      'training': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      'course': 'bg-green-100 text-green-800 border-green-200',
+      'webinar': 'bg-teal-100 text-teal-800 border-teal-200',
+      
+      // Sports & Fitness
+      'sports': 'bg-orange-100 text-orange-800 border-orange-200',
+      'fitness': 'bg-orange-100 text-orange-800 border-orange-200',
+      'marathon': 'bg-red-100 text-red-800 border-red-200',
+      'tournament': 'bg-red-100 text-red-800 border-red-200',
+      
+      // Arts & Culture
+      'art': 'bg-violet-100 text-violet-800 border-violet-200',
+      'exhibition': 'bg-violet-100 text-violet-800 border-violet-200',
+      'theater': 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200',
+      'cultural': 'bg-rose-100 text-rose-800 border-rose-200',
+      
+      // Food & Lifestyle
+      'food': 'bg-amber-100 text-amber-800 border-amber-200',
+      'cooking': 'bg-amber-100 text-amber-800 border-amber-200',
+      'lifestyle': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      'wellness': 'bg-lime-100 text-lime-800 border-lime-200',
+      
+      // Technology
+      'technology': 'bg-slate-100 text-slate-800 border-slate-200',
+      'tech': 'bg-slate-100 text-slate-800 border-slate-200',
+      'startup': 'bg-gray-100 text-gray-800 border-gray-200',
+      
+      // Community & Social
+      'community': 'bg-sky-100 text-sky-800 border-sky-200',
+      'social': 'bg-sky-100 text-sky-800 border-sky-200',
+      'charity': 'bg-green-100 text-green-800 border-green-200',
+      'fundraising': 'bg-green-100 text-green-800 border-green-200',
+    };
+    
+    const normalizedCategory = category.toLowerCase();
+    return categoryStyles[normalizedCategory] || 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
   return (
@@ -81,24 +142,28 @@ export default function EventCard({ eventId }: { eventId: Id<"events"> }) {
           </div>
         )}
         
-        {/* Status badges */}
+        {/* Category Badge */}
         <div className="absolute top-4 left-4 flex gap-2">
-          {event.status === "published" && (
-            <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
-              Published
-            </span>
-          )}
-          {event.is_free && (
-            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
-              Free
+          {event.event_category && (
+            <span className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${getCategoryStyle(event.event_category)} backdrop-blur-sm`}>
+              {event.event_category}
             </span>
           )}
           {isPastEvent && (
-            <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs font-medium">
+            <span className="bg-gray-900/70 text-white px-2 py-1 rounded-full text-xs font-medium backdrop-blur-sm">
               Past Event
             </span>
           )}
         </div>
+        
+        {/* Free Event Badge */}
+        {event.is_free && !isPastEvent && (
+          <div className="absolute top-4 right-4">
+            <span className="bg-green-500 text-white px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm border border-white/20">
+              FREE
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="p-6">
@@ -141,14 +206,7 @@ export default function EventCard({ eventId }: { eventId: Id<"events"> }) {
             )}
           </div>
 
-          {/* Category Badge */}
-          {event.event_category && (
-            <div className="flex flex-wrap gap-2">
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                {event.event_category}
-              </span>
-            </div>
-          )}
+
 
           {/* Action Button */}
           <div className="pt-2">

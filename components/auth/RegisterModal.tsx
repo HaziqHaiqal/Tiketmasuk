@@ -36,10 +36,10 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  
+
   // Account type selection
   const [accountType, setAccountType] = useState<"customer" | "organizer">("customer");
-  
+
   // Organizer-specific fields
   const [fullName, setFullName] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -49,7 +49,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
   const [primaryLocation, setPrimaryLocation] = useState("");
   const [phone, setPhone] = useState("");
   const [website, setWebsite] = useState("");
-  
+
   // Optional business fields
   const [businessName, setBusinessName] = useState("");
   const [businessRegistration, setBusinessRegistration] = useState("");
@@ -59,7 +59,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
     const hasUpperCase = /[A-Z]/.test(password);
     const hasLowerCase = /[a-z]/.test(password);
     const hasNumbers = /\d/.test(password);
-    
+
     return {
       minLength,
       hasUpperCase,
@@ -124,9 +124,9 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
     }
 
     try {
-      await signIn("password", { 
-        email, 
-        password, 
+      await signIn("password", {
+        email,
+        password,
         name: accountType === "organizer" ? fullName : name,
         accountType,
         // Include organizer fields if account type is organizer
@@ -142,7 +142,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
           businessName,
           businessRegistration,
         }),
-        flow: "signUp" 
+        flow: "signUp"
       });
       onOpenChange(false);
       // Reset form
@@ -212,7 +212,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
               Join Tiketmasuk! 🚀
             </DialogTitle>
             <DialogDescription className="text-indigo-100 text-base text-center">
-              {accountType === "organizer" 
+              {accountType === "organizer"
                 ? "Start creating amazing events today"
                 : "Discover and attend incredible events"
               }
@@ -230,11 +230,10 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                 <button
                   type="button"
                   onClick={() => setAccountType("customer")}
-                  className={`flex-1 py-4 px-4 border-b-2 font-medium text-base transition-all duration-200 ${
-                    accountType === "customer"
+                  className={`flex-1 py-4 px-4 border-b-2 font-medium text-base transition-all duration-200 ${accountType === "customer"
                       ? "border-blue-500 text-blue-600"
                       : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-center space-x-2">
                     <span className="text-lg">🎫</span>
@@ -244,11 +243,10 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                 <button
                   type="button"
                   onClick={() => setAccountType("organizer")}
-                  className={`flex-1 py-4 px-4 border-b-2 font-medium text-base transition-all duration-200 ${
-                    accountType === "organizer"
+                  className={`flex-1 py-4 px-4 border-b-2 font-medium text-base transition-all duration-200 ${accountType === "organizer"
                       ? "border-purple-500 text-purple-600"
                       : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-center space-x-2">
                     <span className="text-lg">🏪</span>
@@ -257,10 +255,10 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                 </button>
               </nav>
             </div>
-            
+
             {/* Tab Content */}
             <div className="pt-4">
-                                            {accountType === "customer" ? (
+              {accountType === "customer" ? (
                 <div className="text-center">
                   <div className="text-blue-600 font-semibold mb-1">Customer Account</div>
                   <div className="text-gray-600 text-sm">Perfect for discovering and attending amazing events in your area</div>
@@ -305,7 +303,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                   <span className="hidden sm:inline">Google</span>
                   <span className="sm:hidden">Google</span>
                 </Button>
-                
+
                 <Button
                   variant="outline"
                   className="h-12 border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 font-medium rounded-xl transition-all duration-200"
@@ -313,7 +311,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                   disabled={isLoading}
                 >
                   <svg className="w-5 h-5 mr-2" fill="#1877F2" viewBox="0 0 24 24">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                   </svg>
                   <span className="hidden sm:inline">Facebook</span>
                   <span className="sm:hidden">Facebook</span>
@@ -334,8 +332,8 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
 
           {/* Email Sign Up Form */}
           <form onSubmit={handleEmailSignUp} className="space-y-4">
-                      {/* Customer Name Field - Only for customers */}
-          {accountType === "customer" && (
+            {/* Customer Name Field - Only for customers */}
+            {accountType === "customer" && (
               <div className="space-y-2">
                 <Label htmlFor="customerName" className="text-sm font-semibold text-gray-700">
                   Full Name
@@ -452,175 +450,176 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
                 </div>
               </div>
             )}
-          </form>
 
-          {/* Additional Details Section - Only for Organizers */}
-          {accountType === "organizer" && (
-            <div className="space-y-4">
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2 text-center">
-                  Business Details
-                </h3>
-                <p className="text-sm text-gray-600 text-center mb-6">
-                  Complete your business profile to start creating events
-                </p>
-                
-                <div className="space-y-4">
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="displayName" className="text-sm font-semibold text-gray-700">
-                        Display Name
-                      </Label>
-                      <div className="relative">
-                        <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        <Input
-                          id="displayName"
-                          type="text"
-                          placeholder="e.g., ABC Corp, XYZ Foundation"
-                          value={displayName}
-                          onChange={(e) => setDisplayName(e.target.value)}
-                          autoComplete="organization"
-                          className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
-                          required
-                        />
-                      </div>
-                    </div>
+            {/* Additional Details Section - Only for Organizers */}
+            {accountType === "organizer" && (
+              <div className="space-y-4">
+                <div className="border-t border-gray-200 pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2 text-center">
+                    Business Details
+                  </h3>
+                  <p className="text-sm text-gray-600 text-center mb-6">
+                    Complete your business profile to start creating events
+                  </p>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="organizationName" className="text-sm font-semibold text-gray-700">
-                        Organization Name
-                      </Label>
-                      <div className="relative">
-                        <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                        </svg>
-                        <Input
-                          id="organizationName"
-                          type="text"
-                          placeholder="e.g., ABC Development Corporation"
-                          value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                          autoComplete="organization-title"
-                          className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
-                          required
-                        />
+                  <div className="space-y-4">
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="displayName" className="text-sm font-semibold text-gray-700">
+                          Display Name
+                        </Label>
+                        <div className="relative">
+                          <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                          <Input
+                            id="displayName"
+                            type="text"
+                            placeholder="e.g., ABC Corp, XYZ Foundation"
+                            value={displayName}
+                            onChange={(e) => setDisplayName(e.target.value)}
+                            autoComplete="organization"
+                            className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
+                            required
+                          />
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="storeName" className="text-sm font-semibold text-gray-700">
-                        Store Name
-                      </Label>
-                      <div className="relative">
-                        <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                        </svg>
-                        <Input
-                          id="storeName"
-                          type="text"
-                          placeholder="e.g., ABC Store, Premium Hub"
-                          value={storeName}
-                          onChange={(e) => setStoreName(e.target.value)}
-                          autoComplete="off"
-                          className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
-                          required
-                        />
+                      <div className="space-y-2">
+                        <Label htmlFor="organizationName" className="text-sm font-semibold text-gray-700">
+                          Organization Name
+                        </Label>
+                        <div className="relative">
+                          <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          </svg>
+                          <Input
+                            id="organizationName"
+                            type="text"
+                            placeholder="e.g., ABC Development Corporation"
+                            value={fullName}
+                            onChange={(e) => setFullName(e.target.value)}
+                            autoComplete="organization-title"
+                            className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
+                            required
+                          />
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="primaryLocation" className="text-sm font-semibold text-gray-700">
-                        Primary Location
-                      </Label>
-                      <div className="relative">
-                        <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4-4a1 1 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <Input
-                          id="primaryLocation"
-                          type="text"
-                          placeholder="City, State/Province, Country"
-                          value={primaryLocation}
-                          onChange={(e) => setPrimaryLocation(e.target.value)}
-                          autoComplete="address-level1"
-                          className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
-                          required
-                        />
+                      <div className="space-y-2">
+                        <Label htmlFor="storeName" className="text-sm font-semibold text-gray-700">
+                          Store Name
+                        </Label>
+                        <div className="relative">
+                          <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          </svg>
+                          <Input
+                            id="storeName"
+                            type="text"
+                            placeholder="e.g., ABC Store, Premium Hub"
+                            value={storeName}
+                            onChange={(e) => setStoreName(e.target.value)}
+                            autoComplete="off"
+                            className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
+                            required
+                          />
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="phone" className="text-sm font-semibold text-gray-700">
-                        Phone Number
-                      </Label>
-                      <div className="relative">
-                        <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                        </svg>
-                        <Input
-                          id="phone"
-                          type="tel"
-                          placeholder="Your contact number"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          autoComplete="tel"
-                          className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
-                          required
-                        />
+                      <div className="space-y-2">
+                        <Label htmlFor="primaryLocation" className="text-sm font-semibold text-gray-700">
+                          Primary Location
+                        </Label>
+                        <div className="relative">
+                          <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4-4a1 1 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <Input
+                            id="primaryLocation"
+                            type="text"
+                            placeholder="City, State/Province, Country"
+                            value={primaryLocation}
+                            onChange={(e) => setPrimaryLocation(e.target.value)}
+                            autoComplete="address-level1"
+                            className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
+                            required
+                          />
+                        </div>
                       </div>
-                    </div>
-                  </>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="phone" className="text-sm font-semibold text-gray-700">
+                          Phone Number
+                        </Label>
+                        <div className="relative">
+                          <svg className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                          </svg>
+                          <Input
+                            id="phone"
+                            type="tel"
+                            placeholder="Your contact number"
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value)}
+                            autoComplete="tel"
+                            className="pl-12 h-12 border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl transition-all duration-200"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </>
+                  </div>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* Terms and Conditions */}
-          <div className="space-y-4">
-            <div className="flex items-start space-x-2">
-              <Checkbox
-                id="terms"
-                checked={acceptTerms}
-                onCheckedChange={(checked) => setAcceptTerms(checked as boolean)}
-                className="mt-1"
-              />
-              <Label htmlFor="terms" className="text-xs sm:text-sm text-gray-600 leading-relaxed">
-                I agree to the{" "}
-                <a href="/terms" className="text-blue-600 hover:text-blue-700 underline">
-                  Terms of Service
-                </a>{" "}
-                and{" "}
-                <a href="/privacy" className="text-blue-600 hover:text-blue-700 underline">
-                  Privacy Policy
-                </a>
-              </Label>
-            </div>
-
-            {error && (
-              <div className="text-xs sm:text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-2 sm:p-3">
-                {error}
               </div>
             )}
 
-            <Button
-              type="submit"
-              className="w-full h-12 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 group"
-              disabled={isLoading || !acceptTerms}
-            >
-              {isLoading ? (
-                <div className="flex items-center">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3" />
-                  Creating account...
-                </div>
-              ) : (
-                <div className="flex items-center justify-center">
-                  Create Account
-                  <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
+            {/* Terms and Conditions */}
+            <div className="space-y-4">
+              <div className="flex items-start space-x-2">
+                <Checkbox
+                  id="terms"
+                  checked={acceptTerms}
+                  onCheckedChange={(checked) => setAcceptTerms(checked as boolean)}
+                  className="mt-1"
+                />
+                <Label htmlFor="terms" className="text-xs sm:text-sm text-gray-600 leading-relaxed">
+                  I agree to the{" "}
+                  <a href="/terms" className="text-blue-600 hover:text-blue-700 underline">
+                    Terms of Service
+                  </a>{" "}
+                  and{" "}
+                  <a href="/privacy" className="text-blue-600 hover:text-blue-700 underline">
+                    Privacy Policy
+                  </a>
+                </Label>
+              </div>
+
+              {error && (
+                <div className="text-xs sm:text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-2 sm:p-3">
+                  {error}
                 </div>
               )}
-            </Button>
-          </div>
+
+              <Button
+                type="submit"
+                className="w-full h-12 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 group"
+                disabled={isLoading || !acceptTerms}
+              >
+                {isLoading ? (
+                  <div className="flex items-center">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3" />
+                    Creating account...
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center">
+                    Create Account
+                    <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
+                  </div>
+                )}
+              </Button>
+            </div>
+          </form>
+
 
           {/* Switch to Login */}
           <div className="text-center pt-4 border-t border-gray-100">

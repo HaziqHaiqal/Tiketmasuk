@@ -220,6 +220,18 @@ export default defineSchema({
     // LOCATION & VENUE
     venue_id: v.optional(v.id("venues")),
     location_type: v.union(v.literal("physical"), v.literal("online"), v.literal("hybrid")),
+    
+    // MALAYSIAN LOCATION FIELDS
+    state: v.optional(v.union(
+      v.literal("Johor"), v.literal("Kedah"), v.literal("Kelantan"), v.literal("Melaka"),
+      v.literal("Negeri Sembilan"), v.literal("Pahang"), v.literal("Penang"), v.literal("Perak"),
+      v.literal("Perlis"), v.literal("Sabah"), v.literal("Sarawak"), v.literal("Selangor"),
+      v.literal("Terengganu"), v.literal("Kuala Lumpur"), v.literal("Labuan"), v.literal("Putrajaya")
+    )),
+    city: v.optional(v.string()),
+    venue_name: v.optional(v.string()),
+    full_address: v.optional(v.string()),
+    
     online_platform: v.optional(v.object({
       platform: v.union(v.literal("zoom"), v.literal("teams"), v.literal("youtube"), v.literal("custom")),
       url: v.optional(v.string()),
@@ -338,9 +350,11 @@ export default defineSchema({
     .index("by_pending_review", ["moderation_status", "submitted_for_review_at"])
     .index("by_fraud_score", ["fraud_score"])
     .index("by_reviewed_by", ["reviewed_by"])
+    .index("by_state", ["state"])
+    .index("by_location", ["state", "city"])
     .searchIndex("search_events", {
       searchField: "title",
-      filterFields: ["event_category", "status", "location_type", "moderation_status"]
+      filterFields: ["event_category", "status", "location_type", "moderation_status", "state"]
     }),
 
   // ============================================================================
