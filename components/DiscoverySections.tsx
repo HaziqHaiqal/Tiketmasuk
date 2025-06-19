@@ -15,7 +15,7 @@ import { getEventCategory } from "@/lib/eventUtils";
 
 export default function DiscoverySections() {
   const events = useQuery(api.events.getUpcoming, {});
-  const organizers = useQuery(api.organizers.getAll, {});
+  const organizers = useQuery(api.organizers.getVerifiedOrganizersWithStats, {});
   const products = useQuery(api.products.getAll, {});
 
   // Memoize limited items to prevent unnecessary re-renders
@@ -49,7 +49,7 @@ export default function DiscoverySections() {
           description="Meet the amazing organizers creating unforgettable experiences"
           icon={<Users className="w-8 h-8 text-purple-600" />}
           items={limitedOrganizers}
-          renderItem={(organizer, index) => <OrganizerCard key={(organizer as Doc<"organizer_profiles">)._id} organizer={organizer as Doc<"organizer_profiles">} isPriority={index < 2} />}
+          renderItem={(organizer, index) => <OrganizerCard key={(organizer as Doc<"organizer_profiles"> & { live_total_events: number })._id} organizer={organizer as Doc<"organizer_profiles"> & { live_total_events: number }} isPriority={index < 2} />}
           exploreLink="/organizers"
           exploreText="Explore All Organizers"
           isLoading={isLoading}
@@ -156,6 +156,61 @@ function EventCard({ event, isPriority }: EventCardProps) {
   // Get event category using utility function
   const eventCategoryInfo = useMemo(() => getEventCategory(event), [event]);
 
+  const getCategoryStyle = (category: string) => {
+    const categoryStyles: Record<string, string> = {
+      // Music & Entertainment
+      'music': 'bg-purple-100 text-purple-800 border-purple-200',
+      'concert': 'bg-purple-100 text-purple-800 border-purple-200',
+      'festival': 'bg-pink-100 text-pink-800 border-pink-200',
+      'party': 'bg-pink-100 text-pink-800 border-pink-200',
+      
+      // Business & Professional
+      'business': 'bg-blue-100 text-blue-800 border-blue-200',
+      'conference': 'bg-blue-100 text-blue-800 border-blue-200',
+      'workshop': 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      'seminar': 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      'networking': 'bg-cyan-100 text-cyan-800 border-cyan-200',
+      
+      // Education & Learning
+      'education': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      'training': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      'course': 'bg-green-100 text-green-800 border-green-200',
+      'webinar': 'bg-teal-100 text-teal-800 border-teal-200',
+      
+      // Sports & Fitness
+      'sports': 'bg-orange-100 text-orange-800 border-orange-200',
+      'fitness': 'bg-orange-100 text-orange-800 border-orange-200',
+      'marathon': 'bg-red-100 text-red-800 border-red-200',
+      'tournament': 'bg-red-100 text-red-800 border-red-200',
+      
+      // Arts & Culture
+      'art': 'bg-violet-100 text-violet-800 border-violet-200',
+      'exhibition': 'bg-violet-100 text-violet-800 border-violet-200',
+      'theater': 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200',
+      'cultural': 'bg-rose-100 text-rose-800 border-rose-200',
+      
+      // Food & Lifestyle
+      'food': 'bg-amber-100 text-amber-800 border-amber-200',
+      'cooking': 'bg-amber-100 text-amber-800 border-amber-200',
+      'lifestyle': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      'wellness': 'bg-lime-100 text-lime-800 border-lime-200',
+      
+      // Technology
+      'technology': 'bg-slate-100 text-slate-800 border-slate-200',
+      'tech': 'bg-slate-100 text-slate-800 border-slate-200',
+      'startup': 'bg-gray-100 text-gray-800 border-gray-200',
+      
+      // Community & Social
+      'community': 'bg-sky-100 text-sky-800 border-sky-200',
+      'social': 'bg-sky-100 text-sky-800 border-sky-200',
+      'charity': 'bg-green-100 text-green-800 border-green-200',
+      'fundraising': 'bg-green-100 text-green-800 border-green-200',
+    };
+    
+    const normalizedCategory = category.toLowerCase();
+    return categoryStyles[normalizedCategory] || 'bg-gray-100 text-gray-800 border-gray-200';
+  };
+
   return (
     <Card className="group overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2">
       <div className="relative h-48 overflow-hidden">
@@ -172,11 +227,23 @@ function EventCard({ event, isPriority }: EventCardProps) {
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-blue-400 to-purple-500"></div>
         )}
-        <div className="absolute top-4 right-4">
-          <Badge className="bg-white text-gray-900 hover:bg-gray-100">
-            {event.is_free ? "FREE" : "Paid Event"}
-          </Badge>
+        {/* Category Badge */}
+        <div className="absolute top-4 left-4">
+          {event.event_category && (
+            <Badge className={`px-3 py-1.5 text-xs font-semibold border backdrop-blur-sm ${getCategoryStyle(event.event_category)}`}>
+              {event.event_category}
+            </Badge>
+          )}
         </div>
+        
+        {/* Free Event Badge */}
+        {event.is_free && (
+          <div className="absolute top-4 right-4">
+            <Badge className="bg-green-500 text-white hover:bg-green-600 backdrop-blur-sm border border-white/20">
+              FREE
+            </Badge>
+          </div>
+        )}
       </div>
       
       <CardHeader className="pb-2">
@@ -199,19 +266,13 @@ function EventCard({ event, isPriority }: EventCardProps) {
             <span className="line-clamp-1">
               {event.location_type === "online" ? "Online Event" : 
                event.location_type === "hybrid" ? "Hybrid Event" : 
+               (event.state && event.city) ? `${event.city}, ${event.state}` :
                "Physical Event"}
             </span>
           </div>
         </div>
         
-        {/* Event Category Badge */}
-        {eventCategoryInfo && (
-          <div className="mt-3">
-            <Badge className={`${eventCategoryInfo.color} text-white text-xs`}>
-              {eventCategoryInfo.name}
-            </Badge>
-          </div>
-        )}
+
         
                       <Link href={`/events/${event._id}`} className="block mt-4">
           <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
@@ -225,7 +286,7 @@ function EventCard({ event, isPriority }: EventCardProps) {
 
 // Organizer Card Component
 interface OrganizerCardProps {
-  organizer: Doc<"organizer_profiles">;
+  organizer: Doc<"organizer_profiles"> & { live_total_events: number };
   isPriority: boolean;
 }
 
@@ -270,7 +331,7 @@ function OrganizerCard({ organizer, isPriority }: OrganizerCardProps) {
         <div className="space-y-2 text-sm text-gray-600">
           <div className="flex items-center">
             <Calendar className="w-4 h-4 mr-2 text-purple-500" />
-            {organizer.total_events_hosted || 0}+ Events Created
+            {organizer.live_total_events || 0}+ Events Created
           </div>
           <div className="flex items-center">
             <Star className="w-4 h-4 mr-2 text-yellow-500" />
@@ -278,7 +339,7 @@ function OrganizerCard({ organizer, isPriority }: OrganizerCardProps) {
           </div>
         </div>
         
-                      <Link href="/organizers" className="block mt-4">
+                      <Link href={`/organizers/${organizer._id}`} className="block mt-4">
           <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white">
             View Profile
           </Button>
@@ -351,11 +412,11 @@ function ProductCard({ product, isPriority }: ProductCardProps) {
           </div>
         </div>
         
-        <div className="block mt-4">
+        <Link href={`/products/${product._id}`} className="block mt-4">
           <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
             View Product
           </Button>
-        </div>
+        </Link>
       </CardContent>
     </Card>
   );

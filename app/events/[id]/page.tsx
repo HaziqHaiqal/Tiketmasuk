@@ -90,7 +90,7 @@ function EventPageContent({ eventId }: { eventId: string }) {
         {/* Back Button */}
         <div className="mb-6">
           <Link
-            href="/"
+            href="/events"
             className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -150,6 +150,8 @@ function EventPageContent({ eventId }: { eventId: string }) {
                     <p className="text-gray-900 font-medium">
                       {event.location_type === "online" ? "Online Event" : 
                        event.location_type === "hybrid" ? "Hybrid Event" : 
+                       (event.venue_name && event.state) ? `${event.venue_name}, ${event.city}, ${event.state}` :
+                       (event.state && event.city) ? `${event.city}, ${event.state}` :
                        "Physical Event"}
                     </p>
                   </div>
