@@ -9,14 +9,14 @@ const HeroSection = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   return (
-    <section className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white relative overflow-hidden">
+    <section className="h-[calc(100vh-4rem)] bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white relative overflow-hidden flex flex-col">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGRlZnM+CjxwYXR0ZXJuIGlkPSJhIiB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiPgo8cGF0aCBkPSJtMCAwaDQwdjQwaC00MHoiIGZpbGw9Im5vbmUiLz4KPHBhdGggZD0ibTAgMGg0MHY0MGgtNDB6IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iMSIvPgo8L3BhdHRlcm4+CjwvZGVmcz4KPHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNhKSIvPgo8L3N2Zz4=')] bg-repeat"></div>
       </div>
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 relative z-10" suppressHydrationWarning>
-        <div className="text-center" suppressHydrationWarning>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex-grow flex items-center" suppressHydrationWarning>
+        <div className="text-center w-full" suppressHydrationWarning>
           <h1 className="text-4xl md:text-6xl font-bold mb-6">
             Discover Amazing
             <span className="block text-blue-200">Events & Products</span>
@@ -64,7 +64,7 @@ const HeroSection = () => {
       </div>
 
       {/* Stats Section */}
-      <div className="bg-white/10 backdrop-blur-sm" suppressHydrationWarning>
+      {/* <div className="bg-white/10 backdrop-blur-sm" suppressHydrationWarning>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" suppressHydrationWarning>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center" suppressHydrationWarning>
             <div suppressHydrationWarning>
@@ -85,7 +85,7 @@ const HeroSection = () => {
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
     </section>
   );
 };
