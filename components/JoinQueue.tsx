@@ -82,7 +82,7 @@ export default function JoinQueue({ eventId }: Props) {
             ticket_category_id: selection.ticket_category_id,
             requested_quantity: selection.quantity,
             email: userProfile.user.email!,
-            phone: userProfile.profile?.phone,
+            phone: userProfile.customerProfile?.phone,
           })
         )
       );

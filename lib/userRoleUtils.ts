@@ -1,61 +1,150 @@
 import { Doc, Id } from "../convex/_generated/dataModel";
 
-type User = Doc<"users">; // Convex Auth users table
-type UserProfile = Doc<"user_profiles">; // Extended user profile data
+// User role management utilities
+type CustomerProfile = Doc<"customer_profiles">; // Use customer_profiles instead
+type OrganizerProfile = Doc<"organizer_profiles">;
+type UserRole = Doc<"user_roles">;
 
-export type UserRole = "customer" | "organizer" | "admin";
+// Role checking functions
+export function hasRole(userRoles: UserRole[], role: string): boolean {
+  return userRoles.some(r => r.role === role);
+}
 
-/**
- * Check if user has a specific role
- */
-export function hasRole(userProfile: UserProfile, role: UserRole): boolean {
-  return userProfile.roles?.includes(role) || false;
+// Check if user is an organizer
+export function isOrganizer(userRoles: UserRole[], organizerProfile?: OrganizerProfile): boolean {
+  return hasRole(userRoles, "organizer") || !!organizerProfile;
 }
 
 /**
- * Check if user is an organizer (has organizer role)
+ * Check if user is a premium customer
  */
-export function isOrganizer(userProfile: UserProfile): boolean {
-  return hasRole(userProfile, "organizer") || userProfile.is_organizer === true;
+export function isPremiumCustomer(userRoles: UserRole[]): boolean {
+  return hasRole(userRoles, "premium_customer");
+}
+
+/**
+ * Check if user is a regular customer
+ */
+export function isCustomer(userRoles: UserRole[], customerProfile?: CustomerProfile): boolean {
+  return hasRole(userRoles, "customer") || !!customerProfile;
+}
+
+/**
+ * Get the current active role for a user
+ */
+export function getCurrentActiveRole(userRoles: UserRole[]): string {
+  // For now, return the first role or default to customer
+  if (userRoles.length > 0) {
+    return userRoles[0].role;
+  }
+  
+  return "customer";
+}
+
+/**
+ * Get all available roles for a user
+ */
+export function getAvailableRoles(userRoles: UserRole[]): string[] {
+  return userRoles.map(r => r.role);
+}
+
+/**
+ * Check if user can perform admin actions
+ */
+export function canPerformAdminActions(userRoles: UserRole[]): boolean {
+  return hasRole(userRoles, "admin") || hasRole(userRoles, "super_admin");
+}
+
+/**
+ * Check if user can moderate content
+ */
+export function canModerateContent(userRoles: UserRole[]): boolean {
+  return hasRole(userRoles, "moderator") || canPerformAdminActions(userRoles);
+}
+
+/**
+ * Check if user can create events
+ */
+export function canCreateEvents(userRoles: UserRole[], organizerProfile?: OrganizerProfile): boolean {
+  return isOrganizer(userRoles, organizerProfile) && organizerProfile?.isVerified === true;
+}
+
+/**
+ * Check if user can manage bookings
+ */
+export function canManageBookings(userRoles: UserRole[], organizerProfile?: OrganizerProfile): boolean {
+  return isOrganizer(userRoles, organizerProfile);
+}
+
+/**
+ * Get user permissions based on roles
+ */
+export function getUserPermissions(userRoles: UserRole[], organizerProfile?: OrganizerProfile) {
+  return {
+    canCreateEvents: canCreateEvents(userRoles, organizerProfile),
+    canManageBookings: canManageBookings(userRoles, organizerProfile),
+    canModerateContent: canModerateContent(userRoles),
+    canPerformAdminActions: canPerformAdminActions(userRoles),
+    isOrganizer: isOrganizer(userRoles, organizerProfile),
+    isCustomer: isCustomer(userRoles),
+    isPremium: isPremiumCustomer(userRoles),
+  };
+}
+
+/**
+ * Role transition utilities
+ */
+export function prepareOrganizerTransition(customerProfile?: CustomerProfile) {
+  if (!customerProfile) {
+    throw new Error("Customer profile required for organizer transition");
+  }
+
+  const fullName = customerProfile.firstName && customerProfile.lastName 
+    ? `${customerProfile.firstName} ${customerProfile.lastName}` 
+    : "";
+
+  return {
+    // Use customer profile data to pre-fill organizer profile
+    fullName,
+    displayName: fullName,
+    phone: customerProfile.phone || "",
+    // Set default values for organizer-specific fields
+    organizerType: "individual" as const,
+    storeName: "",
+    storeDescription: "",
+    primaryLocation: "",
+    isVerified: false,
+    createdAt: Date.now(),
+  };
 }
 
 /**
  * Check if user is an admin
  */
-export function isAdmin(userProfile: UserProfile): boolean {
-  return hasRole(userProfile, "admin");
+export function isAdmin(userRoles: UserRole[]): boolean {
+  return hasRole(userRoles, "admin");
 }
-
-/**
- * Check if user is a customer (everyone is a customer by default)
- */
-export function isCustomer(userProfile: UserProfile): boolean {
-  return hasRole(userProfile, "customer") || userProfile.roles?.length === 0;
-}
-
-// Legacy alias - will be removed in next version
-export const isAttendee = isCustomer;
 
 /**
  * Get user's current active role (for UI display)
  */
-export function getCurrentRole(userProfile: UserProfile): UserRole {
+export function getCurrentRole(userRoles: UserRole[]): string {
   // Return current active role if set
-  if (userProfile.current_active_role) {
-    return userProfile.current_active_role;
+  if (userRoles.length > 0) {
+    return userRoles[0].role;
   }
   
   // Default logic: admin > organizer > customer
-  if (isAdmin(userProfile)) return "admin";
-  if (isOrganizer(userProfile)) return "organizer";
+  if (isAdmin(userRoles)) return "admin";
+  if (isOrganizer(userRoles)) return "organizer";
   return "customer";
 }
 
 /**
  * Get all roles for a user
  */
-export function getAllRoles(userProfile: UserProfile): UserRole[] {
-  const roles = userProfile.roles || [];
+export function getAllRoles(userRoles: UserRole[]): string[] {
+  const roles = userRoles.map(r => r.role);
   
   // Everyone is at least a customer
   if (!roles.includes("customer")) {
@@ -68,82 +157,91 @@ export function getAllRoles(userProfile: UserProfile): UserRole[] {
 /**
  * Check if user can switch to a specific role
  */
-export function canSwitchToRole(userProfile: UserProfile, targetRole: UserRole): boolean {
-  return getAllRoles(userProfile).includes(targetRole);
+export function canSwitchToRole(userRoles: UserRole[], targetRole: string): boolean {
+  return getAllRoles(userRoles).includes(targetRole);
 }
 
 /**
  * Get role display information
  */
-export function getRoleInfo(role: UserRole): { 
+export function getRoleInfo(role: string): { 
   name: string; 
   description: string; 
   color: string; 
-  icon: string;
+  icon: string; 
 } {
-  const roleMap = {
-    "customer": {
+  const roleInfoMap: Record<string, { name: string; description: string; color: string; icon: string }> = {
+    customer: {
       name: "Customer",
-      description: "Browse and purchase tickets for events",
-      color: "bg-blue-500",
-      icon: "🎫"
+      description: "Browse and book events",
+      color: "blue",
+      icon: "👤"
     },
-    "organizer": {
+    organizer: {
       name: "Organizer", 
-      description: "Create and manage events, sell tickets",
-      color: "bg-green-500",
+      description: "Create and manage events",
+      color: "purple",
       icon: "🎪"
     },
-    "admin": {
+    admin: {
       name: "Admin",
-      description: "Full system access and user management",
-      color: "bg-red-500", 
+      description: "Manage platform and users", 
+      color: "red",
       icon: "⚙️"
     }
   };
-  
-  return roleMap[role];
+
+  return roleInfoMap[role] || roleInfoMap.customer;
 }
 
 /**
  * Generate initial user profile data for new user
  */
-export function createInitialUserProfile(userId: string): Partial<UserProfile> {
+export function createInitialUserProfile(userId: string): Partial<CustomerProfile> {
   return {
-    user_id: userId as Id<"users">,
-    roles: ["customer"], // Everyone starts as customer
-    current_active_role: "customer",
-    is_organizer: false,
-    account_status: "active",
-    verification_level: "unverified",
-    created_at: Date.now(),
+    userId: userId as Id<"users">,
+    firstName: "",
+    lastName: "",
+    phone: "",
+    dateOfBirth: undefined,
+    gender: undefined,
+    address: undefined,
+    language: undefined,
+    timezone: undefined,
+    currency: undefined,
+    notifications: {
+      email: true,
+      push: true,
+      sms: false,
+      marketing: true,
+    },
+    privacy: {
+      profileVisibility: "public",
+      showEmail: false,
+      showPhone: true,
+    },
+    phoneVerified: false,
+    isActive: true,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
   };
 }
 
 /**
  * Upgrade user to organizer when they create their first event
  */
-export function upgradeToOrganizer(userProfile: UserProfile): Partial<UserProfile> {
-      const currentRoles = userProfile.roles || ["customer"];
-  
-  // Add organizer role if not already present
-  if (!currentRoles.includes("organizer")) {
-    currentRoles.push("organizer");
-  }
-  
+export function upgradeToOrganizer(userRoles: UserRole[], customerProfile?: CustomerProfile): any {
+  // Return the organizer profile data
   return {
-    roles: currentRoles,
-    is_organizer: true,
-    organizer_since: userProfile.organizer_since || Date.now(),
-    current_active_role: "organizer", // Switch to organizer mode
-    updated_at: Date.now(),
+    ...prepareOrganizerTransition(customerProfile),
+    updatedAt: Date.now(),
   };
 }
 
 /**
  * Get user capabilities based on their current role
  */
-export function getUserCapabilities(userProfile: UserProfile): {
+export function getUserCapabilities(userRoles: UserRole[]): {
   canCreateEvents: boolean;
   canManageEvents: boolean;
   canViewAllEvents: boolean;
@@ -158,7 +256,7 @@ export function getUserCapabilities(userProfile: UserProfile): {
   canViewModerationLogs: boolean;
   canManageSystemSettings: boolean;
 } {
-  const currentRole = getCurrentRole(userProfile);
+  const currentRole = getCurrentRole(userRoles);
   
   const capabilities = {
     canCreateEvents: false,
@@ -200,21 +298,21 @@ export function getUserCapabilities(userProfile: UserProfile): {
 /**
  * Format role for display in UI
  */
-export function formatRoleForDisplay(role: UserRole): string {
+export function formatRoleForDisplay(role: string): string {
   return getRoleInfo(role).name;
 }
 
 /**
  * Get available role switches for user (for role switching dropdown)
  */
-export function getAvailableRoleSwitches(userProfile: UserProfile): Array<{
-  role: UserRole;
+export function getAvailableRoleSwitches(userRoles: UserRole[]): Array<{
+  role: string;
   name: string;
   description: string;
   isCurrent: boolean;
 }> {
-  const allRoles = getAllRoles(userProfile);
-  const currentRole = getCurrentRole(userProfile);
+  const allRoles = getAllRoles(userRoles);
+  const currentRole = getCurrentRole(userRoles);
   
   return allRoles.map(role => ({
     role,

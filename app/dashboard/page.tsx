@@ -12,7 +12,7 @@ import Spinner from "@/components/Spinner";
 export default function DashboardPage() {
   const { isAuthenticated } = useConvexAuth();
   const router = useRouter();
-  const currentUser = useQuery(api.users.current);
+  const currentUser = useQuery(api.users.getCurrentUser);
   const userProfile = useQuery(api.users.getCurrentUserProfile);
 
   useEffect(() => {
@@ -23,9 +23,9 @@ export default function DashboardPage() {
 
     if (userProfile) {
       // Check user roles and redirect accordingly
-      if (userProfile.profile?.roles?.includes("admin")) {
+      if (userProfile.roles?.includes("admin")) {
         router.push("/dashboard/admin");
-      } else if (userProfile.profile?.roles?.includes("organizer")) {
+      } else if (userProfile.roles?.includes("organizer")) {
         router.push("/dashboard/organizer");
       } else {
         // Regular user - redirect to profile or show upgrade options
@@ -66,20 +66,20 @@ export default function DashboardPage() {
           {/* Role indicators */}
           {userProfile && (
             <div className="flex justify-center space-x-4 text-sm text-gray-500">
-              {userProfile.profile?.roles?.includes("admin") && (
+              {userProfile.roles?.includes("admin") && (
                 <div className="flex items-center">
                   <Shield className="w-4 h-4 mr-1" />
                   Admin
                 </div>
               )}
-              {userProfile.profile?.roles?.includes("organizer") && (
+              {userProfile.roles?.includes("organizer") && (
                 <div className="flex items-center">
                   <Users className="w-4 h-4 mr-1" />
                   Organizer
                 </div>
               )}
-              {(!userProfile.profile?.roles || userProfile.profile.roles.length === 0 || 
-                (userProfile.profile.roles.length === 1 && userProfile.profile.roles[0] === "customer")) && (
+              {(!userProfile.roles || userProfile.roles.length === 0 || 
+                (userProfile.roles.length === 1 && userProfile.roles[0] === "customer")) && (
                 <div className="flex items-center">
                   <Settings className="w-4 h-4 mr-1" />
                   User

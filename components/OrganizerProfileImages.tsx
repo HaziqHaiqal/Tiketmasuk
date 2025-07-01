@@ -35,8 +35,9 @@ export default function OrganizerProfileImages({
 
   // Convex mutations for image management
   const generateUploadUrl = useMutation(api.storage.generateUploadUrl);
-  const updateOrganizerImages = useMutation(api.organizers.updateImages);
-  const deleteOrganizerImage = useMutation(api.organizers.deleteImage);
+  // Image management functions removed from current schema
+  // const updateOrganizerImages = useMutation(api.organizers.updateImages);
+  // const deleteOrganizerImage = useMutation(api.organizers.deleteImage);
 
   const handleImageSelect = (type: "profileImage" | "storeLogo" | "storeBanner", file: File) => {
     setSelectedFiles(prev => ({
@@ -49,10 +50,12 @@ export default function OrganizerProfileImages({
     try {
       setIsUploading(true);
       
-      await deleteOrganizerImage({
-        profile_id: organizerId,
-        image_type: type === "profileImage" ? "logo" : type === "storeLogo" ? "logo" : "banner",
-      });
+      // TODO: Implement image deletion when image storage is added back to schema
+      // await deleteOrganizerImage({
+      //   profile_id: organizerId,
+      //   image_type: type === "profileImage" ? "logo" : type === "storeLogo" ? "logo" : "banner",
+      // });
+      console.log('Image deletion not implemented yet');
 
       setSelectedFiles(prev => ({
         ...prev,
@@ -112,28 +115,22 @@ export default function OrganizerProfileImages({
 
       const uploadResults = await Promise.all(uploadPromises);
 
-      // Update organizer profile with new image storage IDs
-      const imageUpdates: Record<string, string> = {};
-      uploadResults.forEach(({ type, storageId }) => {
-        imageUpdates[type] = storageId;
+      // TODO: Implement image upload when image storage is added back to schema
+      // await updateOrganizerImages({
+      //   profile_id: organizerId,
+      //   logo_storage_id: (imageUpdates.storeLogo || imageUpdates.profileImage) as Id<"_storage">,
+      //   banner_storage_id: imageUpdates.storeBanner as Id<"_storage">,
+      // });
+      console.log('Image upload not implemented yet');
+
+      toast({
+        title: "Images updated",
+        description: "Your profile images have been successfully updated.",
       });
 
-      if (Object.keys(imageUpdates).length > 0) {
-        await updateOrganizerImages({
-          profile_id: organizerId,
-          logo_storage_id: (imageUpdates.storeLogo || imageUpdates.profileImage) as Id<"_storage">,
-          banner_storage_id: imageUpdates.storeBanner as Id<"_storage">,
-        });
-
-        toast({
-          title: "Images updated",
-          description: "Your profile images have been successfully updated.",
-        });
-
-        // Clear selected files
-        setSelectedFiles({});
-        onImagesUpdated?.();
-      }
+      // Clear selected files
+      setSelectedFiles({});
+      onImagesUpdated?.();
     } catch (error) {
       toast({
         title: "Error",

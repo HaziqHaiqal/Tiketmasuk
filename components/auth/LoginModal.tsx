@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import Image from "next/image";
-import { Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, ArrowRight, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,18 +23,30 @@ interface LoginModalProps {
   onSwitchToRegister?: () => void;
 }
 
+type LoginStep = "signin" | "verification" | "forgot-password" | "reset-verification";
+
 export function LoginModal({ open, onOpenChange, onSwitchToRegister }: LoginModalProps) {
   const { signIn } = useAuthActions();
+  const [step, setStep] = useState<LoginStep>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [resetCode, setResetCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
   const resetForm = () => {
+    setStep("signin");
     setEmail("");
     setPassword("");
+    setVerificationCode("");
+    setResetCode("");
+    setNewPassword("");
     setShowPassword(false);
+    setShowNewPassword(false);
     setError("");
   };
 
@@ -44,11 +56,139 @@ export function LoginModal({ open, onOpenChange, onSwitchToRegister }: LoginModa
     setError("");
 
     try {
-      await signIn("password", { email, password, flow: "signIn" });
+      const result = await signIn("password", { email, password, flow: "signIn" });
+      
+      // If result is false/null, it means verification is required
+      if (!result) {
+        setStep("verification");
+      } else {
+        // Sign in successful
+        onOpenChange(false);
+        resetForm();
+      }
+    } catch (err: any) {
+      console.error("Sign in error:", err);
+      setError(err.message || "Invalid email or password. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    if (!verificationCode.trim()) {
+      setError("Please enter the verification code.");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      await signIn("password", {
+        email,
+        code: verificationCode,
+        flow: "email-verification"
+      });
+      
       onOpenChange(false);
       resetForm();
-    } catch (err) {
-      setError("Invalid email or password. Please try again.");
+    } catch (err: any) {
+      console.error("Verification error:", err);
+      setError(err.message || "Invalid verification code. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    if (!email.trim()) {
+      setError("Please enter your email address.");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      await signIn("password", {
+        email,
+        flow: "reset"
+      });
+      
+      setStep("reset-verification");
+    } catch (err: any) {
+      console.error("Password reset error:", err);
+      setError(err.message || "Failed to send password reset email. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    if (!resetCode.trim()) {
+      setError("Please enter the reset code.");
+      setIsLoading(false);
+      return;
+    }
+
+    if (!newPassword.trim()) {
+      setError("Please enter a new password.");
+      setIsLoading(false);
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      await signIn("password", {
+        email,
+        code: resetCode,
+        newPassword,
+        flow: "reset-verification"
+      });
+      
+      onOpenChange(false);
+      resetForm();
+    } catch (err: any) {
+      console.error("Reset verification error:", err);
+      setError(err.message || "Invalid reset code. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    setIsLoading(true);
+    setError("");
+
+    try {
+      if (step === "verification") {
+        await signIn("password", {
+          email,
+          flow: "signIn"
+        });
+      } else if (step === "reset-verification") {
+        await signIn("password", {
+          email,
+          flow: "reset"
+        });
+      }
+      setError(""); // Clear any previous errors
+    } catch (err: any) {
+      console.error("Resend error:", err);
+      setError("Failed to resend code. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -85,6 +225,277 @@ export function LoginModal({ open, onOpenChange, onSwitchToRegister }: LoginModa
     onSwitchToRegister?.();
   };
 
+  // Render email verification step
+  if (step === "verification") {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="w-[90vw] max-w-md max-h-[90vh] overflow-y-auto !bg-white !border-0 !shadow-2xl !rounded-2xl !p-0 gap-0">
+          <div className="bg-gradient-to-br from-green-600 via-blue-600 to-purple-600 p-8 rounded-t-2xl">
+            <DialogHeader className="text-center space-y-3">
+              <DialogTitle className="text-2xl font-bold text-white text-center">
+                Check Your Email 📧
+              </DialogTitle>
+              <DialogDescription className="text-green-100 text-base text-center">
+                We've sent a verification code to {email}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="p-8 space-y-6">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Mail className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Enter Verification Code</h3>
+              <p className="text-gray-600 text-sm">
+                Please enter the 6-digit code we sent to your email address
+              </p>
+            </div>
+
+            <form onSubmit={handleVerifyEmail} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="verificationCode" className="text-sm font-semibold text-gray-700">
+                  Verification Code
+                </Label>
+                <Input
+                  id="verificationCode"
+                  type="text"
+                  placeholder="Enter 6-digit code"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="h-12 border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl transition-all duration-200 text-center text-2xl font-mono tracking-wider"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  required
+                />
+              </div>
+
+              {error && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+                  {error}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                disabled={isLoading || verificationCode.length !== 6}
+              >
+                {isLoading ? (
+                  <div className="flex items-center">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3" />
+                    Verifying...
+                  </div>
+                ) : (
+                  "Verify Email"
+                )}
+              </Button>
+            </form>
+
+            <div className="text-center space-y-3">
+              <p className="text-gray-600 text-sm">
+                Didn't receive the code?{" "}
+                <button
+                  onClick={handleResendCode}
+                  disabled={isLoading}
+                  className="text-blue-600 hover:text-blue-700 font-semibold hover:underline"
+                >
+                  Resend code
+                </button>
+              </p>
+              
+              <button
+                onClick={() => setStep("signin")}
+                className="flex items-center justify-center w-full text-gray-600 hover:text-gray-700 font-medium"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to sign in
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Render forgot password step
+  if (step === "forgot-password") {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="w-[90vw] max-w-md max-h-[90vh] overflow-y-auto !bg-white !border-0 !shadow-2xl !rounded-2xl !p-0 gap-0">
+          <div className="bg-gradient-to-br from-orange-600 via-red-600 to-pink-600 p-8 rounded-t-2xl">
+            <DialogHeader className="text-center space-y-3">
+              <DialogTitle className="text-2xl font-bold text-white text-center">
+                Reset Password 🔑
+              </DialogTitle>
+              <DialogDescription className="text-orange-100 text-base text-center">
+                Enter your email to receive a reset code
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="p-8 space-y-6">
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="resetEmail" className="text-sm font-semibold text-gray-700">
+                  Email address
+                </Label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Input
+                    id="resetEmail"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-12 h-12 border-2 border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 rounded-xl transition-all duration-200"
+                    required
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+                  {error}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full h-12 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <div className="flex items-center">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3" />
+                    Sending reset code...
+                  </div>
+                ) : (
+                  "Send Reset Code"
+                )}
+              </Button>
+            </form>
+
+            <button
+              onClick={() => setStep("signin")}
+              className="flex items-center justify-center w-full text-gray-600 hover:text-gray-700 font-medium"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to sign in
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Render password reset verification step
+  if (step === "reset-verification") {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="w-[90vw] max-w-md max-h-[90vh] overflow-y-auto !bg-white !border-0 !shadow-2xl !rounded-2xl !p-0 gap-0">
+          <div className="bg-gradient-to-br from-orange-600 via-red-600 to-pink-600 p-8 rounded-t-2xl">
+            <DialogHeader className="text-center space-y-3">
+              <DialogTitle className="text-2xl font-bold text-white text-center">
+                Reset Your Password 🔐
+              </DialogTitle>
+              <DialogDescription className="text-orange-100 text-base text-center">
+                Enter the code sent to {email}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="p-8 space-y-6">
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="resetCode" className="text-sm font-semibold text-gray-700">
+                  Reset Code
+                </Label>
+                <Input
+                  id="resetCode"
+                  type="text"
+                  placeholder="Enter reset code"
+                  value={resetCode}
+                  onChange={(e) => setResetCode(e.target.value.toUpperCase())}
+                  className="h-12 border-2 border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 rounded-xl transition-all duration-200 text-center text-xl font-mono tracking-wider"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="newPassword" className="text-sm font-semibold text-gray-700">
+                  New Password
+                </Label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Input
+                    id="newPassword"
+                    type={showNewPassword ? "text" : "password"}
+                    placeholder="Enter new password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="pl-12 pr-12 h-12 border-2 border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 rounded-xl transition-all duration-200"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                  >
+                    {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+                  {error}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full h-12 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <div className="flex items-center">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3" />
+                    Resetting password...
+                  </div>
+                ) : (
+                  "Reset Password"
+                )}
+              </Button>
+            </form>
+
+            <div className="text-center space-y-3">
+              <p className="text-gray-600 text-sm">
+                Didn't receive the code?{" "}
+                <button
+                  onClick={handleResendCode}
+                  disabled={isLoading}
+                  className="text-red-600 hover:text-red-700 font-semibold hover:underline"
+                >
+                  Resend code
+                </button>
+              </p>
+              
+              <button
+                onClick={() => setStep("forgot-password")}
+                className="flex items-center justify-center w-full text-gray-600 hover:text-gray-700 font-medium"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to email entry
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Render main sign in form
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[90vw] max-w-md max-h-[90vh] overflow-y-auto !bg-white !border-0 !shadow-2xl !rounded-2xl !p-0 gap-0">
@@ -199,6 +610,17 @@ export function LoginModal({ open, onOpenChange, onSwitchToRegister }: LoginModa
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+            </div>
+
+            {/* Forgot Password Link */}
+            <div className="text-right">
+              <button
+                type="button"
+                onClick={() => setStep("forgot-password")}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium hover:underline"
+              >
+                Forgot password?
+              </button>
             </div>
 
             {error && (

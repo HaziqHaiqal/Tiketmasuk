@@ -9,6 +9,7 @@ import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useEventCategories, transformEventCategoriesForSelect, FALLBACK_EVENT_CATEGORIES } from "@/lib/configUtils";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,20 +20,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar, Users, MapPin } from "lucide-react";
 import Spinner from "./Spinner";
 
-const eventFormSchema = z.object({
+// Create a dynamic schema that will be validated at runtime
+const createEventFormSchema = (validCategories: string[]) => z.object({
   title: z.string().min(2, "Title must be at least 2 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
   start_datetime: z.date(),
   end_datetime: z.date().optional(),
-  event_category: z.enum([
-    "sports", "music", "food", "travel", "technology", 
-    "arts", "business", "education", "health", "entertainment"
-  ]),
+  event_category: z.enum(validCategories.length > 0 ? validCategories as [string, ...string[]] : ["other"]),
   location_type: z.enum(["physical", "online", "hybrid"]).default("physical"),
   is_free: z.boolean().default(false),
 });
 
-type EventFormData = z.infer<typeof eventFormSchema>;
+type EventFormData = {
+  title: string;
+  description: string;
+  start_datetime: Date;
+  end_datetime?: Date;
+  event_category: string;
+  location_type: "physical" | "online" | "hybrid";
+  is_free: boolean;
+};
 
 interface EventFormProps {
   mode: "create" | "edit";
@@ -54,6 +61,13 @@ export default function EventForm({ mode, initialData, onFormSubmit }: EventForm
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { isAuthenticated } = useConvexAuth();
+
+  // Get dynamic configurations
+  const eventCategories = useEventCategories();
+  const availableCategories = eventCategories || FALLBACK_EVENT_CATEGORIES;
+  
+  // Create schema with dynamic categories
+  const eventFormSchema = createEventFormSchema(availableCategories);
 
   // Get organizer profile
   const organizerProfile = useQuery(
@@ -110,6 +124,7 @@ export default function EventForm({ mode, initialData, onFormSubmit }: EventForm
         await updateEvent({
           event_id: initialData._id,
           ...eventData,
+          event_category: eventData.event_category as any,
         });
         eventId = initialData._id;
         toast({
@@ -117,7 +132,10 @@ export default function EventForm({ mode, initialData, onFormSubmit }: EventForm
           description: "Event updated successfully",
         });
       } else {
-        eventId = await createEvent(eventData);
+        eventId = await createEvent({
+          ...eventData,
+          event_category: eventData.event_category as any,
+        });
         toast({
           title: "Success", 
           description: "Event created successfully",
@@ -252,16 +270,11 @@ export default function EventForm({ mode, initialData, onFormSubmit }: EventForm
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="sports">Sports</SelectItem>
-                          <SelectItem value="music">Music</SelectItem>
-                          <SelectItem value="food">Food</SelectItem>
-                          <SelectItem value="travel">Travel</SelectItem>
-                          <SelectItem value="technology">Technology</SelectItem>
-                          <SelectItem value="arts">Arts</SelectItem>
-                          <SelectItem value="business">Business</SelectItem>
-                          <SelectItem value="education">Education</SelectItem>
-                          <SelectItem value="health">Health</SelectItem>
-                          <SelectItem value="entertainment">Entertainment</SelectItem>
+                          {transformEventCategoriesForSelect(availableCategories).map((category) => (
+                            <SelectItem key={category.value} value={category.value}>
+                              {category.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />

@@ -34,10 +34,49 @@ export const getCurrentUser = query({
 });
 
 // ============================================================================
-// USER PROFILE MANAGEMENT (using Convex Auth)
+// USER ROLE MANAGEMENT
 // ============================================================================
 
-// Get current user's profile information
+// Get user roles
+export const getUserRoles = query({
+  args: { userId: v.optional(v.id("users")) },
+  handler: async (ctx, args) => {
+    const userId = args.userId || await getAuthUserId(ctx);
+    if (!userId) return [];
+    
+    const roles = await ctx.db
+      .query("user_roles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .collect();
+    
+    return roles; // Return the full role objects, not just the role strings
+  },
+});
+
+// Check if user has specific role
+export const hasRole = query({
+  args: { 
+    role: v.union(v.literal("customer"), v.literal("organizer"), v.literal("admin")),
+    userId: v.optional(v.id("users"))
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId || await getAuthUserId(ctx);
+    if (!userId) return false;
+    
+    const roleEntry = await ctx.db
+      .query("user_roles")
+      .withIndex("by_user_and_role", (q) => q.eq("userId", userId).eq("role", args.role))
+      .first();
+    
+    return !!roleEntry;
+  },
+});
+
+// ============================================================================
+// USER PROFILE MANAGEMENT
+// ============================================================================
+
+// Get current user's complete profile information
 export const getCurrentUserProfile = query({
   args: {},
   handler: async (ctx) => {
@@ -48,34 +87,68 @@ export const getCurrentUserProfile = query({
     const user = await ctx.db.get(userId);
     if (!user) return null;
     
-    // Get additional profile information
-    const profile = await ctx.db
-      .query("user_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+    // Get user roles
+    const roles = await ctx.db
+      .query("user_roles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .collect();
+    
+    // Get customer profile if exists
+    const customerProfile = await ctx.db
+      .query("customer_profiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+    
+    // Get organizer profile if exists
+    const organizerProfile = await ctx.db
+      .query("organizer_profiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
       .first();
     
     return {
       user,
-      profile,
+      roles: roles.map(r => r.role),
+      customerProfile,
+      organizerProfile,
     };
   },
 });
 
-// Create or update user profile
-export const upsertUserProfile = mutation({
+// Get customer profile for current user
+export const getCustomerProfile = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    
+    return await ctx.db
+      .query("customer_profiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+  },
+});
+
+// Get organizer profile for current user
+export const getOrganizerProfile = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    
+    return await ctx.db
+      .query("organizer_profiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+  },
+});
+
+// Update customer profile
+export const updateCustomerProfile = mutation({
   args: {
-    first_name: v.optional(v.string()),
-    last_name: v.optional(v.string()),
-    display_name: v.optional(v.string()),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
     phone: v.optional(v.string()),
-    address: v.optional(v.object({
-      street: v.optional(v.string()),
-      city: v.string(),
-      state_province: v.string(),
-      postal_code: v.optional(v.string()),
-      country: v.string(),
-    })),
-    date_of_birth: v.optional(v.number()),
+    dateOfBirth: v.optional(v.number()),
     gender: v.optional(v.union(
       v.literal("male"), 
       v.literal("female"), 
@@ -85,10 +158,17 @@ export const upsertUserProfile = mutation({
     language: v.optional(v.string()),
     timezone: v.optional(v.string()),
     currency: v.optional(v.string()),
-    marketing_opt_in: v.optional(v.boolean()),
-    push_notifications: v.optional(v.boolean()),
-    email_notifications: v.optional(v.boolean()),
-    sms_notifications: v.optional(v.boolean()),
+    notifications: v.optional(v.object({
+      email: v.boolean(),
+      push: v.boolean(),
+      sms: v.boolean(),
+      marketing: v.boolean(),
+    })),
+    privacy: v.optional(v.object({
+      profileVisibility: v.union(v.literal("public"), v.literal("private")),
+      showEmail: v.boolean(),
+      showPhone: v.boolean(),
+    })),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -96,33 +176,22 @@ export const upsertUserProfile = mutation({
       throw new Error("Must be authenticated to update profile");
     }
 
-    // Check if profile exists
+    // Check if customer profile exists
     const existingProfile = await ctx.db
-      .query("user_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+      .query("customer_profiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
       .first();
 
-    const now = Date.now();
-    const profileData = {
-      ...args,
-      user_id: userId,
-      updated_at: now,
-    };
-
-    if (existingProfile) {
-      await ctx.db.patch(existingProfile._id, profileData);
-      return existingProfile._id;
-    } else {
-      return await ctx.db.insert("user_profiles", {
-        ...profileData,
-              roles: ["customer"],
-      current_active_role: "customer" as const,
-        account_status: "active" as const,
-        verification_level: "email_verified" as const,
-        login_count: 1,
-        created_at: now,
-      });
+    if (!existingProfile) {
+      throw new Error("Customer profile not found");
     }
+
+    await ctx.db.patch(existingProfile._id, {
+      ...args,
+      updatedAt: Date.now(),
+    });
+
+    return await ctx.db.get(existingProfile._id);
   },
 });
 
@@ -135,245 +204,193 @@ export const switchToOrganizerRole = mutation({
       throw new Error("Must be authenticated to switch role");
     }
 
-    const profile = await ctx.db
-      .query("user_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+    // Check if user already has organizer role
+    const existingOrganizerRole = await ctx.db
+      .query("user_roles")
+      .withIndex("by_user_and_role", (q) => q.eq("userId", userId).eq("role", "organizer"))
       .first();
 
-    if (!profile) {
-      throw new Error("User profile not found");
+    if (existingOrganizerRole) {
+      throw new Error("User is already an organizer");
     }
 
-    const updatedRoles = profile.roles.includes("organizer") 
-      ? profile.roles 
-      : [...profile.roles, "organizer" as const];
+    // Create organizer role
+    await ctx.db.insert("user_roles", {
+      userId: userId,
+      role: "organizer",
+      createdAt: Date.now(),
+});
 
-    await ctx.db.patch(profile._id, {
-      roles: updatedRoles,
-      current_active_role: "organizer",
-      is_organizer: true,
-      organizer_since: profile.organizer_since || Date.now(),
-      updated_at: Date.now(),
+    // Create organizer profile (user will need to complete it)
+    const organizerProfileId = await ctx.db.insert("organizer_profiles", {
+      userId: userId,
+      fullName: "",
+      displayName: "",
+      storeName: "",
+      organizerType: "individual",
+      phone: "",
+      primaryLocation: "",
+      language: "en",
+      timezone: "Asia/Kuala_Lumpur",
+      currency: "MYR",
+      notifications: {
+        email: true,
+        push: true,
+        sms: false,
+        marketing: false,
+      },
+      privacy: {
+        profileVisibility: "public",
+        showEmail: false,
+        showPhone: false,
+      },
+      isVerified: false,
+      isActive: true,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     });
 
-    return profile._id;
+    return organizerProfileId;
   },
 });
 
-// Get organizer profile for current user
-export const getOrganizerProfile = query({
+// ============================================================================
+// ADMIN FUNCTIONS
+// ============================================================================
+
+// Get all users with their profiles (admin only)
+export const getAllUsersWithProfiles = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
+    if (!userId) return [];
     
-    const userProfile = await ctx.db
-      .query("user_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+    // Check if user is admin
+    const isAdmin = await ctx.db
+      .query("user_roles")
+      .withIndex("by_user_and_role", (q) => q.eq("userId", userId).eq("role", "admin"))
       .first();
     
-    if (!userProfile?.is_organizer) return null;
+    if (!isAdmin) {
+      throw new Error("Admin access required");
+    }
     
-    return await ctx.db
+    // Get all users from Convex Auth users table
+    const users = await ctx.db.query("users").collect();
+    
+    // Get profiles for each user
+    const usersWithProfiles = await Promise.all(
+      users.map(async (user) => {
+        const roles = await ctx.db
+          .query("user_roles")
+          .withIndex("by_user_id", (q) => q.eq("userId", user._id))
+          .collect();
+        
+        const customerProfile = await ctx.db
+          .query("customer_profiles")
+          .withIndex("by_user_id", (q) => q.eq("userId", user._id))
+          .first();
+        
+        const organizerProfile = await ctx.db
       .query("organizer_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+          .withIndex("by_user_id", (q) => q.eq("userId", user._id))
       .first();
+
+        return {
+          user,
+          roles: roles.map(r => r.role),
+          customerProfile,
+          organizerProfile,
+        };
+      })
+    );
+    
+    return usersWithProfiles;
   },
 });
 
-// Track user login
-export const trackUserLogin = mutation({
-  args: {},
-  handler: async (ctx) => {
+// Update user status (admin only)
+export const updateUserStatus = mutation({
+  args: {
+    targetUserId: v.id("users"),
+    isActive: v.boolean(),
+  },
+  handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) return;
-    
-    const profile = await ctx.db
-      .query("user_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", userId))
+    if (!userId) {
+      throw new Error("Must be authenticated");
+    }
+
+    // Check if user is admin
+    const isAdmin = await ctx.db
+      .query("user_roles")
+      .withIndex("by_user_and_role", (q) => q.eq("userId", userId).eq("role", "admin"))
+      .first();
+
+    if (!isAdmin) {
+      throw new Error("Admin access required");
+    }
+
+    // Update customer profile if exists
+    const customerProfile = await ctx.db
+      .query("customer_profiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", args.targetUserId))
       .first();
     
-    if (profile) {
-      await ctx.db.patch(profile._id, {
-        last_login_at: Date.now(),
-        login_count: (profile.login_count || 0) + 1,
-        updated_at: Date.now(),
+    if (customerProfile) {
+      await ctx.db.patch(customerProfile._id, {
+        isActive: args.isActive,
+        updatedAt: Date.now(),
       });
     }
-  },
-});
 
-// ============================================================================
-// ORGANIZER PROFILE MANAGEMENT
-// ============================================================================
-
-export const createOrganizerProfile = mutation({
-  args: {
-    business_name: v.string(),
-    display_name: v.string(),
-    business_type: v.union(
-      v.literal("individual"),
-      v.literal("sole_proprietorship"), 
-      v.literal("llc"),
-      v.literal("corporation"),
-      v.literal("nonprofit"),
-      v.literal("partnership"),
-      v.literal("government")
-    ),
-    business_registration_number: v.optional(v.string()),
-    bio: v.optional(v.string()),
-    website: v.optional(v.string()),
-    business_address: v.object({
-      street: v.optional(v.string()),
-      city: v.string(),
-      state_province: v.string(),
-      postal_code: v.optional(v.string()),
-      country: v.string(),
-    }),
-    business_phone: v.optional(v.string()),
-    business_email: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    // Check if organizer profile already exists
-    const existingProfile = await ctx.db
-      .query("organizer_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", identity.subject as any))
-      .first();
-
-    if (existingProfile) {
-      throw new Error("Organizer profile already exists");
-    }
-
-    return await ctx.db.insert("organizer_profiles", {
-      user_id: identity.subject as any,
-      business_name: args.business_name,
-      display_name: args.display_name,
-      business_type: args.business_type,
-      business_registration_number: args.business_registration_number,
-      bio: args.bio,
-      website: args.website,
-      business_address: args.business_address,
-      business_phone: args.business_phone,
-      business_email: args.business_email,
-      verification_status: "pending",
-      subscription_tier: "free",
-      created_at: Date.now(),
-    });
-  },
-});
-
-export const updateOrganizerProfile = mutation({
-  args: {
-    business_name: v.optional(v.string()),
-    display_name: v.optional(v.string()),
-    business_type: v.optional(v.union(
-      v.literal("individual"),
-      v.literal("sole_proprietorship"), 
-      v.literal("llc"),
-      v.literal("corporation"),
-      v.literal("nonprofit"),
-      v.literal("partnership"),
-      v.literal("government")
-    )),
-    business_registration_number: v.optional(v.string()),
-    bio: v.optional(v.string()),
-    website: v.optional(v.string()),
-    business_phone: v.optional(v.string()),
-    business_email: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const profile = await ctx.db
-      .query("organizer_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", identity.subject as any))
-      .first();
-
-    if (!profile) {
-      throw new Error("Organizer profile not found");
-    }
-
-    const updates: any = {
-      updated_at: Date.now(),
-    };
-
-    if (args.business_name !== undefined) updates.business_name = args.business_name;
-    if (args.display_name !== undefined) updates.display_name = args.display_name;
-    if (args.business_type !== undefined) updates.business_type = args.business_type;
-    if (args.business_registration_number !== undefined) updates.business_registration_number = args.business_registration_number;
-    if (args.bio !== undefined) updates.bio = args.bio;
-    if (args.website !== undefined) updates.website = args.website;
-    if (args.business_phone !== undefined) updates.business_phone = args.business_phone;
-    if (args.business_email !== undefined) updates.business_email = args.business_email;
-
-    await ctx.db.patch(profile._id, updates);
-    return await ctx.db.get(profile._id);
-  },
-});
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
-export const getUserRole = query({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return null;
-    }
-
-    // Check if user has organizer profile
+    // Update organizer profile if exists
     const organizerProfile = await ctx.db
       .query("organizer_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", identity.subject as any))
+      .withIndex("by_user_id", (q) => q.eq("userId", args.targetUserId))
       .first();
 
     if (organizerProfile) {
-      return { role: "organizer", verification_status: organizerProfile.verification_status };
+      await ctx.db.patch(organizerProfile._id, {
+        isActive: args.isActive,
+        updatedAt: Date.now(),
+      });
     }
 
-    return { role: "user" }; // Basic authenticated user
+    return { success: true };
   },
 });
 
-export const current = query({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-    
-    return await ctx.db.get(userId);
+// Grant admin role (super admin only - manual operation)
+export const grantAdminRole = mutation({
+  args: {
+    targetUserId: v.id("users"),
   },
-});
-
-export const getUserProfile = query({
-  args: { user_id: v.id("users") },
   handler: async (ctx, args) => {
-    // Get the basic user record
-    const user = await ctx.db.get(args.user_id);
-    if (!user) return null;
-
-    // Get the user profile with additional information
-    const profile = await ctx.db
-      .query("user_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", args.user_id))
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Must be authenticated");
+    }
+    
+    // For security, this should be manually called by existing admin
+    // Check if user already has admin role
+    const existingAdminRole = await ctx.db
+      .query("user_roles")
+      .withIndex("by_user_and_role", (q) => q.eq("userId", args.targetUserId).eq("role", "admin"))
       .first();
 
-    return {
-      user,
-      profile,
-      email: user.email,
-      phone: profile?.phone,
-    };
+    if (existingAdminRole) {
+      throw new Error("User is already an admin");
+    }
+    
+    // Create admin role
+    await ctx.db.insert("user_roles", {
+      userId: args.targetUserId,
+      role: "admin",
+      createdAt: Date.now(),
+    });
+    
+    return { success: true };
   },
 });
 

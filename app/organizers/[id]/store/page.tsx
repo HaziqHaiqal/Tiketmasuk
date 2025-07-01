@@ -20,11 +20,11 @@ interface OrganizerStorePageProps {
 }
 
 function OrganizerStoreContent({ organizerId }: { organizerId: string }) {
-  const organizer = useQuery(api.organizers.getProfileWithImages, {
-    organizer_id: organizerId as Id<"organizer_profiles">,
+  const organizer = useQuery(api.organizers.getProfile, {
+    organizerId: organizerId as Id<"organizer_profiles">,
   });
 
-  const organizerProducts = useQuery(api.products.getByOrganizer, {
+  const products = useQuery(api.products.getByOrganizer, {
     organizer_id: organizerId as Id<"organizer_profiles">,
   });
 
@@ -40,7 +40,7 @@ function OrganizerStoreContent({ organizerId }: { organizerId: string }) {
             className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
-            Back to {organizer?.display_name || 'Organizer'}
+            Back to {organizer?.displayName || 'Organizer'}
           </Link>
         </div>
 
@@ -53,7 +53,7 @@ function OrganizerStoreContent({ organizerId }: { organizerId: string }) {
             <div>
               {organizer ? (
                 <>
-                  <h1 className="text-3xl font-bold text-gray-900">{organizer.display_name}</h1>
+                  <h1 className="text-3xl font-bold text-gray-900">{organizer.displayName}</h1>
                   <p className="text-gray-600">Official Store</p>
                 </>
               ) : (
@@ -85,13 +85,13 @@ function OrganizerStoreContent({ organizerId }: { organizerId: string }) {
             </Link>
             <button className="flex items-center gap-2 px-4 py-4 border-b-2 border-purple-600 text-purple-600 font-medium">
               <Package className="w-4 h-4" />
-              Store ({organizerProducts?.length || '...'})
+              Store ({products?.length || '...'})
             </button>
           </div>
         </div>
 
         {/* Store Content */}
-        {organizerProducts === undefined ? (
+        {products === undefined ? (
           // Loading state for products
           <div>
             <div className="flex items-center gap-3 mb-6">
@@ -117,16 +117,16 @@ function OrganizerStoreContent({ organizerId }: { organizerId: string }) {
               ))}
             </div>
           </div>
-        ) : organizerProducts.length > 0 ? (
+        ) : products.length > 0 ? (
           <div>
             <div className="flex items-center gap-3 mb-6">
               <Package className="w-6 h-6 text-green-600" />
               <h2 className="text-2xl font-bold text-gray-900">
-                Products ({organizerProducts.length})
+                Products ({products.length})
               </h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {organizerProducts.map((product) => (
+              {products.map((product) => (
                 <ProductStoreCard key={product._id} product={product} />
               ))}
             </div>
@@ -136,7 +136,7 @@ function OrganizerStoreContent({ organizerId }: { organizerId: string }) {
             <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-medium text-gray-900 mb-2">Store Coming Soon</h3>
             <p className="text-gray-600">
-              {organizer?.display_name || 'This organizer'} hasn't added any products to their store yet. Check back later for merchandise and event essentials!
+              {organizer?.displayName || 'This organizer'} hasn't added any products to their store yet. Check back later for merchandise and event essentials!
             </p>
           </div>
         )}

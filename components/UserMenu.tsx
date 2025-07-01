@@ -25,7 +25,7 @@ export function UserMenu() {
   
   // Get current user profile using proper Convex Auth
   const userProfile = useQuery(api.users.getCurrentUserProfile);
-  const trackLogin = useMutation(api.users.trackUserLogin);
+  // const trackLogin = useMutation(api.users.trackUserLogin); // Function removed
 
   const handleSignOut = async () => {
     try {
@@ -35,12 +35,12 @@ export function UserMenu() {
     }
   };
 
-  // Track login when component mounts and user is authenticated
-  useEffect(() => {
-    if (isAuthenticated && userProfile) {
-      trackLogin({});
-    }
-  }, [isAuthenticated, userProfile, trackLogin]);
+  // Login tracking removed
+  // useEffect(() => {
+  //   if (isAuthenticated && userProfile) {
+  //     trackLogin({});
+  //   }
+  // }, [isAuthenticated, userProfile, trackLogin]);
 
   return (
     <div suppressHydrationWarning>

@@ -24,7 +24,7 @@ interface EventPageProps {
 function EventPageContent({ eventId }: { eventId: string }) {
   const { isAuthenticated } = useConvexAuth();
   const [authModal, setAuthModal] = useState<"login" | "register" | null>(null);
-  const currentUser = useQuery(api.users.current);
+  const currentUser = useQuery(api.users.getCurrentUser);
 
   const event = useQuery(api.events.getById, {
     event_id: eventId as Id<"events">,

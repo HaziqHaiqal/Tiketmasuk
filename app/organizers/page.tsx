@@ -2,19 +2,34 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MapPin, Star, Calendar, Users, Award } from "lucide-react";
+import { MapPin, Star, Calendar, Users, Award, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useStorageUrl } from "@/lib/utils";
 import { Doc } from "@/convex/_generated/dataModel";
 import Spinner from "@/components/Spinner";
 
-type OrganizerWithStats = Doc<"organizer_profiles"> & {
-  live_total_events: number;
-};
+interface OrganizerWithStats {
+  _id: Id<"organizer_profiles">;
+  _creationTime: number;
+  userId?: Id<"users">;
+  fullName?: string;
+  displayName?: string;
+  storeName?: string;
+  storeDescription?: string;
+  organizerType?: "individual" | "group" | "organization" | "business";
+  primaryLocation?: string;
+  phone?: string;
+  website?: string;
+  businessName?: string;
+  businessRegistration?: string;
+  isVerified?: boolean;
+  liveTotalEvents: number;
+}
 
 export default function OrganizersPage() {
   const organizers = useQuery(api.organizers.getVerifiedOrganizersWithStats);
@@ -71,110 +86,62 @@ interface OrganizerCardProps {
 }
 
 function OrganizerCard({ organizer }: OrganizerCardProps) {
-  const logoUrl = useStorageUrl(organizer.logo_storage_id);
-  const bannerUrl = useStorageUrl(organizer.banner_storage_id);
-
   return (
-    <Card className="group overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2">
-      {/* Banner/Header Image */}
-      <div className="relative h-32 bg-gradient-to-r from-blue-500 to-purple-600">
-        {bannerUrl ? (
-          <Image
-            src={bannerUrl}
-            alt={`${organizer.display_name} banner`}
-            fill
-            className="object-cover"
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-r from-blue-500 to-purple-600" />
-        )}
-        
-        {/* Logo Overlay */}
-        <div className="absolute -bottom-8 left-6">
-          <div className="w-16 h-16 rounded-full bg-white p-1 shadow-lg">
-            {logoUrl ? (
-              <Image
-                src={logoUrl}
-                alt={organizer.display_name}
-                width={64}
-                height={64}
-                className="w-full h-full rounded-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full rounded-full bg-gray-200 flex items-center justify-center">
-                <Users className="w-6 h-6 text-gray-500" />
-              </div>
-            )}
-          </div>
+    <div className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
+      {/* Banner - Use placeholder */}
+      <div className="h-32 bg-gradient-to-r from-blue-500 to-purple-600">
+      </div>
+
+      <div className="p-6 -mt-12 relative">
+        {/* Profile Image - Use placeholder */}
+        <div className="w-20 h-20 bg-gray-200 rounded-full border-4 border-white mb-4 flex items-center justify-center">
+          <span className="text-2xl font-bold text-gray-600">
+            {organizer.displayName?.charAt(0).toUpperCase() || '?'}
+          </span>
         </div>
 
         {/* Verification Badge */}
-        {organizer.verification_status === "verified" && (
-          <div className="absolute top-4 right-4">
-            <Badge className="bg-green-500 text-white">
-              <Award className="w-3 h-3 mr-1" />
-              Verified
-            </Badge>
+        {organizer.isVerified && (
+          <div className="absolute top-4 right-4 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Verified
           </div>
         )}
-      </div>
-      
-      <CardHeader className="pt-12 pb-2">
-        <CardTitle className="text-lg group-hover:text-blue-600 transition-colors">
-          {organizer.display_name}
-        </CardTitle>
-        <CardDescription className="line-clamp-2">
-          {organizer.bio || "Creating amazing events and experiences"}
-        </CardDescription>
-      </CardHeader>
-      
-      <CardContent className="pt-0 space-y-4">
+
+        {/* Organizer Info */}
+        <h3 className="text-xl font-bold text-gray-900 mb-1">
+          {organizer.displayName || 'Unknown Organizer'}
+        </h3>
+        <p className="text-gray-600 text-sm mb-4">
+          {organizer.storeDescription || "Creating amazing events and experiences"}
+        </p>
+
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div className="flex items-center text-gray-600">
-            <Calendar className="w-4 h-4 mr-2 text-blue-500" />
-            <span>{organizer.live_total_events || 0} Events</span>
+        <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+          <div className="flex items-center">
+            <Calendar className="w-4 h-4 mr-1" />
+            <span>{organizer.liveTotalEvents || 0} Events</span>
           </div>
-          <div className="flex items-center text-gray-600">
-            <Star className="w-4 h-4 mr-2 text-yellow-500" />
-            <span>{organizer.average_rating || 4.5}/5</span>
+          <div className="flex items-center">
+            <Star className="w-4 h-4 mr-1 fill-yellow-400 text-yellow-400" />
+            <span>4.5/5</span>
           </div>
         </div>
 
-        {/* Location */}
-        {organizer.business_address && (
-          <div className="flex items-center text-sm text-gray-600">
-            <MapPin className="w-4 h-4 mr-2 text-blue-500" />
-            <span className="line-clamp-1">
-              {organizer.business_address.city}, {organizer.business_address.state_province}
-            </span>
-          </div>
-        )}
+        {/* Location - Use primaryLocation */}
+        <div className="flex items-center text-sm text-gray-500 mb-4">
+          <MapPin className="w-4 h-4 mr-1" />
+          <span>{organizer.primaryLocation || 'Location not specified'}</span>
+        </div>
 
-        {/* Categories */}
-        {organizer.specialties && organizer.specialties.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {organizer.specialties.slice(0, 2).map((spec: string) => (
-              <Badge key={spec} variant="secondary" className="text-xs">
-                {spec}
-              </Badge>
-            ))}
-            {organizer.specialties.length > 2 && (
-              <Badge variant="secondary" className="text-xs">
-                +{organizer.specialties.length - 2} more
-              </Badge>
-            )}
-          </div>
-        )}
-        
-        {/* View Profile Button */}
-        <Link href={`/organizers/${organizer._id}`} className="block">
-          <Button className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white">
-            View Profile & Events
-          </Button>
+        {/* Action Button */}
+        <Link
+          href={`/organizers/${organizer._id}`}
+          className="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 px-4 rounded-lg transition-colors duration-200"
+        >
+          View Profile
         </Link>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 } 

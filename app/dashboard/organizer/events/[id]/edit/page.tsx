@@ -22,7 +22,7 @@ export default function EditEventPage() {
   const event = useQuery(api.events.getById, {
     event_id: eventId,
   });
-  const currentUser = useQuery(api.users.current);
+  const currentUser = useQuery(api.users.getCurrentUser);
   const userProfile = useQuery(api.users.getCurrentUserProfile);
 
   if (!isAuthenticated) {
@@ -44,7 +44,7 @@ export default function EditEventPage() {
   }
 
   // Check if user has organizer role
-  if (!userProfile?.profile?.roles?.includes("organizer")) {
+  if (!userProfile?.roles?.includes("organizer")) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Alert className="border-orange-200 bg-orange-50">

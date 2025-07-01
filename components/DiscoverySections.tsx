@@ -291,26 +291,16 @@ interface OrganizerCardProps {
 }
 
 function OrganizerCard({ organizer, isPriority }: OrganizerCardProps) {
-  const imageUrl = useStorageUrl(organizer.logo_storage_id);
+  // Remove image URL reference since it's not in the schema
 
   return (
     <Card className="group overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2">
       <div className="relative h-48 overflow-hidden">
-        {imageUrl ? (
-          <Image
-            src={imageUrl}
-            alt={organizer.display_name}
-            fill
-            className="object-cover group-hover:scale-110 transition-transform duration-300"
-            priority={isPriority}
-            loading={isPriority ? "eager" : "lazy"}
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center">
-            <Users className="w-16 h-16 text-white opacity-70" />
-          </div>
-        )}
+        <div className="w-full h-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center">
+          <span className="text-4xl font-bold text-white">
+            {organizer.displayName?.charAt(0).toUpperCase() || '?'}
+          </span>
+        </div>
         <div className="absolute top-4 right-4">
           <Badge className="bg-white text-gray-900 hover:bg-gray-100">
             Organizer
@@ -320,10 +310,10 @@ function OrganizerCard({ organizer, isPriority }: OrganizerCardProps) {
       
       <CardHeader className="pb-2">
         <CardTitle className="text-lg line-clamp-1 group-hover:text-purple-600 transition-colors">
-          {organizer.display_name}
+          {organizer.displayName || 'Unknown Organizer'}
         </CardTitle>
         <CardDescription className="line-clamp-2">
-          {organizer.bio || "Creating amazing events and experiences"}
+          {organizer.storeDescription || "Creating amazing events and experiences"}
         </CardDescription>
       </CardHeader>
       
@@ -335,11 +325,11 @@ function OrganizerCard({ organizer, isPriority }: OrganizerCardProps) {
           </div>
           <div className="flex items-center">
             <Star className="w-4 h-4 mr-2 text-yellow-500" />
-            {organizer.average_rating || 4.5} Rating
+            4.5 Rating
           </div>
         </div>
         
-                      <Link href={`/organizers/${organizer._id}`} className="block mt-4">
+        <Link href={`/organizers/${organizer._id}`} className="block mt-4">
           <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white">
             View Profile
           </Button>
@@ -419,5 +409,52 @@ function ProductCard({ product, isPriority }: ProductCardProps) {
         </Link>
       </CardContent>
     </Card>
+  );
+}
+
+function FeaturedOrganizerCard({ organizer }: { organizer: any }) {
+  // Remove image URL reference since it's not in the schema
+  
+  return (
+    <div className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
+      <div className="p-6">
+        {/* Profile Image - Use placeholder */}
+        <div className="w-16 h-16 bg-gray-200 rounded-full mb-4 flex items-center justify-center">
+          <span className="text-xl font-bold text-gray-600">
+            {organizer.displayName?.charAt(0).toUpperCase() || '?'}
+          </span>
+        </div>
+
+        {/* Organizer Info */}
+        <div className="mb-4">
+          <h3 className="text-lg font-bold text-gray-900 mb-1">
+            {organizer.displayName || 'Unknown Organizer'}
+          </h3>
+          <p className="text-gray-600 text-sm line-clamp-2">
+            {organizer.storeDescription || "Creating amazing events and experiences"}
+          </p>
+        </div>
+
+        {/* Stats */}
+        <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+          <div className="flex items-center">
+            <Calendar className="w-4 h-4 mr-1" />
+            <span>{organizer.eventCount || 0} Events</span>
+          </div>
+          <div className="flex items-center">
+            <Star className="w-4 h-4 mr-1 fill-yellow-400 text-yellow-400" />
+            <span>4.5 Rating</span>
+          </div>
+        </div>
+
+        {/* Action Button */}
+        <Link
+          href={`/organizers/${organizer._id}`}
+          className="block w-full bg-blue-600 hover:bg-blue-700 text-white text-center py-2 px-4 rounded-lg transition-colors duration-200"
+        >
+          View Profile
+        </Link>
+      </div>
+    </div>
   );
 } 

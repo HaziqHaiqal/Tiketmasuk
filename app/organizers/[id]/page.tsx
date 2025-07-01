@@ -3,15 +3,24 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Users, ArrowLeft, Calendar, Package, Star, MapPin, Globe, Mail, Phone } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { useState, useEffect } from "react";
-import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { 
+  ArrowLeft, 
+  Calendar, 
+  Users, 
+  Package, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  Globe, 
+  Star,
+  Clock
+} from "lucide-react";
 import Link from "next/link";
-import { useStorageUrl } from "@/lib/utils";
-import Spinner from "@/components/Spinner";
+import Image from "next/image";
+import { useState, useEffect } from "react";
 
 interface OrganizerPageProps {
   params: Promise<{
@@ -21,7 +30,7 @@ interface OrganizerPageProps {
 
 function OrganizerPageContent({ organizerId }: { organizerId: string }) {
   const organizer = useQuery(api.organizers.getProfileWithStats, {
-    organizer_id: organizerId as Id<"organizer_profiles">,
+    organizerId: organizerId as Id<"organizer_profiles">,
   });
 
   const organizerEvents = useQuery(api.events.getByOrganizer, {
@@ -32,34 +41,25 @@ function OrganizerPageContent({ organizerId }: { organizerId: string }) {
     organizer_id: organizerId as Id<"organizer_profiles">,
   });
 
-  const logoUrl = organizer?.logo_url;
-  const bannerUrl = organizer?.banner_url;
+  // Note: Image URLs removed from schema - using placeholder logic
+  const logoUrl = null; // organizer?.logoUrl;
+  const bannerUrl = null; // organizer?.bannerUrl;
 
-  // Don't block the entire page - we'll show loading states in specific sections
-
-  const getBusinessTypeLabel = () => {
-    if (!organizer) return "";
-    const labels = {
+  const getOrganizerTypeLabel = () => {
+    if (!organizer || !organizer.organizerType) return "";
+    const labels: Record<string, string> = {
       individual: "Individual",
-      sole_proprietorship: "Sole Proprietorship",
-      llc: "LLC",
-      corporation: "Corporation",
-      nonprofit: "Non-Profit",
-      partnership: "Partnership",
-      government: "Government"
+      business: "Business"
     };
-    return labels[organizer.business_type] || organizer.business_type;
+    return labels[organizer.organizerType] || organizer.organizerType;
   };
 
   const getVerificationBadge = () => {
     if (!organizer) return null;
-    if (organizer.verification_status === "verified") {
+    if (organizer.isVerified) {
       return <Badge className="bg-green-100 text-green-800">✓ Verified</Badge>;
     }
-    if (organizer.verification_status === "pending") {
-      return <Badge className="bg-yellow-100 text-yellow-800">⏳ Pending</Badge>;
-    }
-    return <Badge className="bg-red-100 text-red-800">✗ Unverified</Badge>;
+    return <Badge className="bg-yellow-100 text-yellow-800">⏳ Pending Verification</Badge>;
   };
 
   const formatDate = (timestamp: number) => {
@@ -90,7 +90,7 @@ function OrganizerPageContent({ organizerId }: { organizerId: string }) {
             {bannerUrl && (
               <Image
                 src={bannerUrl}
-                alt={`${organizer?.display_name || 'Organizer'} banner`}
+                alt={`${organizer?.displayName || 'Organizer'} banner`}
                 fill
                 className="object-cover"
                 priority
@@ -104,7 +104,7 @@ function OrganizerPageContent({ organizerId }: { organizerId: string }) {
                 {logoUrl ? (
                   <Image
                     src={logoUrl}
-                    alt={organizer?.display_name || 'Organizer'}
+                    alt={organizer?.displayName || 'Organizer'}
                     width={88}
                     height={88}
                     className="w-full h-full rounded-full object-cover"
@@ -119,8 +119,8 @@ function OrganizerPageContent({ organizerId }: { organizerId: string }) {
               <div className="text-white pb-2">
                 {organizer ? (
                   <>
-                    <h1 className="text-3xl font-bold">{organizer.display_name}</h1>
-                    <p className="text-purple-100">{getBusinessTypeLabel()}</p>
+                    <h1 className="text-3xl font-bold">{organizer.displayName}</h1>
+                    <p className="text-purple-100">{getOrganizerTypeLabel()}</p>
                   </>
                 ) : (
                   <>
@@ -216,11 +216,11 @@ function OrganizerPageContent({ organizerId }: { organizerId: string }) {
                 <div className="lg:col-span-2 space-y-6">
                   <Card>
                     <CardHeader>
-                      <CardTitle>About {organizer.display_name}</CardTitle>
+                      <CardTitle>About {organizer.displayName}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-gray-700 leading-relaxed">
-                        {organizer.bio || "This organizer hasn't added a bio yet."}
+                      <p className="text-gray-600 leading-relaxed">
+                        {organizer.storeDescription || "This organizer hasn't added a description yet."}
                       </p>
                     </CardContent>
                   </Card>
@@ -231,20 +231,11 @@ function OrganizerPageContent({ organizerId }: { organizerId: string }) {
                       <CardTitle>Contact Information</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {organizer.business_email && (
-                        <div className="flex items-center gap-3">
-                          <Mail className="w-5 h-5 text-gray-400" />
-                          <a href={`mailto:${organizer.business_email}`} className="text-blue-600 hover:underline">
-                            {organizer.business_email}
-                          </a>
-                        </div>
-                      )}
-                      
-                      {organizer.business_phone && (
+                      {organizer.phone && (
                         <div className="flex items-center gap-3">
                           <Phone className="w-5 h-5 text-gray-400" />
-                          <a href={`tel:${organizer.business_phone}`} className="text-blue-600 hover:underline">
-                            {organizer.business_phone}
+                          <a href={`tel:${organizer.phone}`} className="text-blue-600 hover:underline">
+                            {organizer.phone}
                           </a>
                         </div>
                       )}
@@ -253,9 +244,9 @@ function OrganizerPageContent({ organizerId }: { organizerId: string }) {
                         <div className="flex items-center gap-3">
                           <Globe className="w-5 h-5 text-gray-400" />
                           <a 
-                            href={organizer.website.startsWith('http') ? organizer.website : `https://${organizer.website}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            href={organizer.website} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
                             className="text-blue-600 hover:underline"
                           >
                             {organizer.website}
@@ -263,24 +254,19 @@ function OrganizerPageContent({ organizerId }: { organizerId: string }) {
                         </div>
                       )}
 
-                      <div className="flex items-start gap-3">
-                        <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
-                        <div>
-                          <p className="font-medium">Business Address</p>
-                          <p className="text-gray-600">
-                            {organizer.business_address.street && `${organizer.business_address.street}, `}
-                            {organizer.business_address.city}, {organizer.business_address.state_province}
-                            {organizer.business_address.postal_code && ` ${organizer.business_address.postal_code}`}
-                            <br />
-                            {organizer.business_address.country}
-                          </p>
+                      {organizer.primaryLocation && (
+                        <div className="flex items-center gap-3">
+                          <MapPin className="w-5 h-5 text-gray-400" />
+                          <span className="text-gray-600">
+                            {organizer.primaryLocation}
+                          </span>
                         </div>
-                      </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
 
-                {/* Stats & Info Sidebar */}
+                {/* Stats Sidebar */}
                 <div className="space-y-6">
                   <Card>
                     <CardHeader>
@@ -288,50 +274,45 @@ function OrganizerPageContent({ organizerId }: { organizerId: string }) {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Events Hosted</span>
-                        <span className="font-semibold">{organizer.live_total_events || 0}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-600">Total Products</span>
-                        <span className="font-semibold">{organizerProducts?.length || 0}</span>
+                        <span className="text-gray-600">Total Events</span>
+                        <span className="font-semibold">{organizer.liveTotalEvents || 0}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">Rating</span>
                         <div className="flex items-center gap-1">
-                          <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                          <span className="font-semibold">{organizer.average_rating || 4.5}</span>
+                          <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                          <span className="font-semibold">4.5</span>
                         </div>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-gray-600">Member Since</span>
-                        <span className="font-semibold">{formatDate(organizer.created_at)}</span>
+                        <span className="font-semibold">{formatDate(organizer.createdAt || organizer._creationTime)}</span>
                       </div>
                     </CardContent>
                   </Card>
 
+                  {/* Business Details */}
                   <Card>
                     <CardHeader>
                       <CardTitle>Business Details</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-3">
+                    <CardContent className="space-y-4">
                       <div>
-                        <p className="text-sm text-gray-600">Business Name</p>
-                        <p className="font-medium">{organizer.business_name}</p>
+                        <span className="text-gray-600 block text-sm">Business Name</span>
+                        <p className="font-medium">{organizer.businessName || organizer.displayName}</p>
                       </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Business Type</p>
-                        <p className="font-medium">{getBusinessTypeLabel()}</p>
-                      </div>
-                      {organizer.business_registration_number && (
+                      
+                      {organizer.businessRegistration && (
                         <div>
-                          <p className="text-sm text-gray-600">Registration Number</p>
-                          <p className="font-medium">{organizer.business_registration_number}</p>
+                          <span className="text-gray-600 block text-sm">Registration</span>
+                          <p className="font-medium">{organizer.businessRegistration}</p>
                         </div>
                       )}
+
                       <div>
-                        <p className="text-sm text-gray-600">Subscription</p>
+                        <span className="text-gray-600 block text-sm">Account Type</span>
                         <Badge variant="outline" className="mt-1">
-                          {organizer.subscription_tier?.toUpperCase() || 'FREE'}
+                          {getOrganizerTypeLabel()}
                         </Badge>
                       </div>
                     </CardContent>
@@ -351,14 +332,14 @@ export default function OrganizerPage({ params }: OrganizerPageProps) {
 
   useEffect(() => {
     async function resolveParams() {
-      const { id } = await params;
-      setOrganizerId(id);
+      const resolvedParams = await params;
+      setOrganizerId(resolvedParams.id);
     }
     resolveParams();
   }, [params]);
 
   if (!organizerId) {
-    return <Spinner fullScreen />;
+    return <div>Loading...</div>;
   }
 
   return <OrganizerPageContent organizerId={organizerId} />;

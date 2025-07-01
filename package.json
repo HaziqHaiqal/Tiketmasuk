@@ -33,11 +33,13 @@
     "date-fns": "^4.1.0",
     "lucide-react": "^0.516.0",
     "next": "^15.3.3",
+    "oslo": "^1.2.1",
     "react": "^19",
     "react-day-picker": "^9.7.0",
     "react-dom": "^19",
     "react-hook-form": "^7.58.0",
     "react-qr-code": "^2.0.16",
+    "resend": "^4.6.0",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
     "zod": "^3.25.67"

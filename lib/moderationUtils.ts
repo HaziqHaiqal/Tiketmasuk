@@ -1,7 +1,8 @@
 import { Doc, Id } from "../convex/_generated/dataModel";
 
 type Event = Doc<"events">;
-type UserProfile = Doc<"user_profiles">;
+type CustomerProfile = Doc<"customer_profiles">;
+type OrganizerProfile = Doc<"organizer_profiles">;
 
 export type ModerationStatus = 
   | "not_submitted" 
@@ -30,12 +31,12 @@ export interface FraudAnalysisResult {
 /**
  * Analyze event for potential fraud and calculate risk score
  */
-export function analyzeEventForFraud(event: Event, organizer: UserProfile): FraudAnalysisResult {
+export function analyzeEventForFraud(event: Event, organizer: OrganizerProfile): FraudAnalysisResult {
   const riskFactors: RiskFactor[] = [];
   let riskScore = 0;
 
   // 1. New Organizer Risk (25 points)
-  if (!organizer.organizer_since || Date.now() - organizer.organizer_since < 30 * 24 * 60 * 60 * 1000) {
+  if (!organizer.createdAt || Date.now() - organizer.createdAt < 30 * 24 * 60 * 60 * 1000) {
     riskFactors.push("new_organizer");
     riskScore += 25;
   }
@@ -210,7 +211,7 @@ export function getRiskFactorInfo(factor: RiskFactor): {
 /**
  * Prepare event for submission to admin review
  */
-export function prepareEventForReview(event: Event, organizer: UserProfile): Partial<Event> {
+export function prepareEventForReview(event: Event, organizer: OrganizerProfile): Partial<Event> {
   const fraudAnalysis = analyzeEventForFraud(event, organizer);
   
   return {
@@ -359,4 +360,14 @@ export function formatFraudScore(score: number): {
       description: "High risk event"
     };
   }
+}
+
+export function canCreateEvent(organizer: OrganizerProfile): boolean {
+  // Check if organizer has been active for at least 30 days
+  if (!organizer.createdAt || Date.now() - organizer.createdAt < 30 * 24 * 60 * 60 * 1000) {
+    return false;
+  }
+
+  // Check verification status
+  return organizer.isVerified === true;
 } 

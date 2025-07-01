@@ -304,11 +304,8 @@ export const getGroupBooking = query({
     // Get event details
     const event = await ctx.db.get(groupBooking.event_id);
 
-    // Get group leader details
-    const leaderProfile = await ctx.db
-      .query("user_profiles")
-      .withIndex("by_user_id", (q) => q.eq("user_id", groupBooking.group_leader_id))
-      .first();
+          // Get group leader details directly by ID
+      const leaderProfile = await ctx.db.get(groupBooking.group_leader_id);
 
     // Get member bookings
     const memberBookings = await Promise.all(
@@ -414,6 +411,26 @@ export const getUserGroupBookings = query({
     return {
       asLeader: leaderGroups,
       asMember: memberGroups,
+    };
+  },
+});
+
+export const getGroupBookingDetails = query({
+  args: { groupBookingId: v.id("group_bookings") },
+  handler: async (ctx, args) => {
+    const groupBooking = await ctx.db.get(args.groupBookingId);
+    if (!groupBooking) return null;
+
+    // Get group leader info directly by ID
+    const groupLeader = await ctx.db.get(groupBooking.group_leader_id);
+
+    return {
+      ...groupBooking,
+      group_leader: groupLeader ? {
+        _id: groupLeader._id,
+        name: groupLeader.name || "Unknown",
+        email: groupLeader.email || "Unknown",
+      } : null,
     };
   },
 }); 

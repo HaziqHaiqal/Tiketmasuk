@@ -76,8 +76,8 @@ export const create = mutation({
       requires_manual_review: fraudScore > 20,
       submitted_for_review_at: Date.now(),
       
-      created_at: Date.now(),
       updated_at: Date.now(),
+      created_at: Date.now(),
     });
 
     // Create moderation log
@@ -575,7 +575,7 @@ export const createTicketCategory = mutation({
     }
 
     const organizer = await ctx.db.get(event.organizer_id);
-    if (!organizer || organizer.user_id !== identity.subject) {
+    if (!organizer || organizer.userId !== identity.subject) {
       throw new Error("Not authorized to create ticket categories for this event");
     }
 
@@ -584,6 +584,7 @@ export const createTicketCategory = mutation({
       is_active: true,
       sold_quantity: 0,
       reserved_quantity: 0,
+      updated_at: Date.now(),
       created_at: Date.now(),
     });
   },
@@ -674,21 +675,31 @@ export const seedOrganizer = mutation({
     
     // Create organizer profile
     const organizerId = await ctx.db.insert("organizer_profiles", {
-      user_id: userId,
-      business_name: "Event Management Co",
-      display_name: "Event Management Co",
-      business_type: "corporation",
-      business_address: {
-        street: "123 Main Street",
-        city: "Kuala Lumpur",
-        state_province: "Federal Territory of Kuala Lumpur",
-        country: "Malaysia",
-        postal_code: "50088"
+      userId: userId,
+      fullName: "Event Management Co",
+      displayName: "Event Management Co",
+      storeName: "Event Management Store",
+      storeDescription: "Professional event management services",
+      organizerType: "business",
+      phone: "+60123456789",
+      primaryLocation: "Kuala Lumpur, Malaysia",
+      businessName: "Event Management Co Sdn Bhd",
+      businessRegistration: "123456789",
+      notifications: {
+        email: true,
+        push: true,
+        sms: false,
+        marketing: true,
       },
-      verification_status: "verified",
-      subscription_tier: "pro",
-      created_at: Date.now(),
-      updated_at: Date.now(),
+      privacy: {
+        profileVisibility: "public",
+        showEmail: false,
+        showPhone: true,
+      },
+      isVerified: true,
+      isActive: true,
+      updatedAt: Date.now(),
+      createdAt: Date.now(),
     });
     
     console.log(`✅ Created organizer with ID: ${organizerId}`);

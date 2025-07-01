@@ -12,7 +12,7 @@ export default function MyBookingsPage() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   
   // Get current user and their bookings with event data
-  const currentUser = useQuery(api.users.current);
+  const currentUser = useQuery(api.users.getCurrentUser);
   const bookingsWithEvents = useQuery(
     api.bookings.getBookingsByUserWithEvents,
     isAuthenticated && currentUser ? {

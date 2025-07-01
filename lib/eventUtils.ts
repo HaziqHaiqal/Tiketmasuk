@@ -1,9 +1,9 @@
-import { Doc } from "../convex/_generated/dataModel";
+import { Doc, Id } from "../convex/_generated/dataModel";
 
 type Event = Doc<"events">;
 type TicketCategory = Doc<"ticket_categories">;
 type User = Doc<"users">; // Convex Auth users table
-type UserProfile = Doc<"user_profiles">; // Extended user profile data
+type CustomerProfile = Doc<"customer_profiles">; // Use customer_profiles instead
 type OrganizerProfile = Doc<"organizer_profiles">;
 
 export type EventType = 

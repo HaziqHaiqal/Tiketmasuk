@@ -16,7 +16,7 @@ import Spinner from "@/components/Spinner";
 export default function OrganizerEventsPage() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const router = useRouter();
-  const currentUser = useQuery(api.users.current);
+  const currentUser = useQuery(api.users.getCurrentUser);
   const userProfile = useQuery(api.users.getCurrentUserProfile);
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export default function OrganizerEventsPage() {
   }
 
   // Check if user has organizer role
-  if (!userProfile?.profile?.roles?.includes("organizer")) {
+  if (!userProfile?.roles?.includes("organizer")) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Alert className="border-orange-200 bg-orange-50">

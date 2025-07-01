@@ -3,186 +3,142 @@ import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
 
 export default defineSchema({
-  // Convex Auth tables - REQUIRED for authentication
+  // Convex Auth automatically creates: users, authAccounts, authSessions, authRefreshTokens, authRateLimit
   ...authTables,
-  // ============================================================================
-  // USER PROFILES - Extending Convex Auth users table
-  // ============================================================================
-  // Note: Convex Auth provides the core 'users' table automatically
-  // We create user_profiles for additional user data
 
-  user_profiles: defineTable({
-    // LINK TO AUTH USER
-    user_id: v.id("users"), // Links to Convex Auth users table
+  // ============================================================================
+  // USER ROLES - Simple role management
+  // ============================================================================
+  user_roles: defineTable({
+    userId: v.id("users"), // Links to Convex Auth users table
+    role: v.union(v.literal("customer"), v.literal("organizer"), v.literal("admin")),
+    
+    // TIMESTAMPS
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_user_id", ["userId"])
+    .index("by_role", ["role"])
+    .index("by_user_and_role", ["userId", "role"]),
+
+  // ============================================================================
+  // CUSTOMER PROFILES - For regular customers (ticket buyers)
+  // ============================================================================
+  customer_profiles: defineTable({
+    userId: v.id("users"), // Links to Convex Auth users table
 
     // PROFILE INFORMATION
-    first_name: v.optional(v.string()),
-    last_name: v.optional(v.string()),
-    display_name: v.optional(v.string()),
-    avatar_storage_id: v.optional(v.id("_storage")),
-    date_of_birth: v.optional(v.number()),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    dateOfBirth: v.optional(v.number()),
     gender: v.optional(v.union(v.literal("male"), v.literal("female"), v.literal("other"), v.literal("prefer_not_to_say"))),
 
-    // CONTACT & LOCATION
-    phone: v.optional(v.string()),
-    phone_verified_at: v.optional(v.number()),
+    // ADDRESS & LOCATION
     address: v.optional(v.object({
       street: v.optional(v.string()),
       city: v.string(),
-      state_province: v.string(),
-      postal_code: v.optional(v.string()),
+      state: v.string(),
+      postalCode: v.optional(v.string()),
       country: v.string(),
-      latitude: v.optional(v.number()),
-      longitude: v.optional(v.number()),
     })),
 
-    // USER ROLES & PERMISSIONS (Industry Standard Approach)
-    // Every user starts as "customer" (account holder who makes purchases), becomes "organizer" when they create first event
-    // Note: "customer" = account holder who buys tickets, "attendees" (in bookings) = people who attend events
-    roles: v.array(v.union(v.literal("customer"), v.literal("organizer"), v.literal("admin"))),
-    current_active_role: v.optional(v.union(v.literal("customer"), v.literal("organizer"), v.literal("admin"))),
-    permissions: v.optional(v.array(v.string())), // Custom permissions beyond role
-
-    // ORGANIZER STATUS (automatically managed)
-    is_organizer: v.optional(v.boolean()), // True when user creates first event
-    organizer_since: v.optional(v.number()), // When they became an organizer
-
-    // PREFERENCES & SETTINGS
+    // PREFERENCES
     language: v.optional(v.string()),
     timezone: v.optional(v.string()),
     currency: v.optional(v.string()),
-    marketing_opt_in: v.optional(v.boolean()),
-    push_notifications: v.optional(v.boolean()),
-    email_notifications: v.optional(v.boolean()),
-    sms_notifications: v.optional(v.boolean()),
-
-    // VERIFICATION & SECURITY
-    account_status: v.union(v.literal("active"), v.literal("suspended"), v.literal("pending"), v.literal("banned")),
-    verification_level: v.union(v.literal("unverified"), v.literal("email_verified"), v.literal("phone_verified"), v.literal("identity_verified")),
-    two_factor_enabled: v.optional(v.boolean()),
-
-    // ANALYTICS & TRACKING
-    last_login_at: v.optional(v.number()),
-    login_count: v.optional(v.number()),
-    referral_code: v.optional(v.string()),
-    referred_by: v.optional(v.id("users")),
-
-    // TIMESTAMPS
-    created_at: v.number(),
-    updated_at: v.optional(v.number()),
-  })
-    .index("by_user_id", ["user_id"])
-    .index("by_roles", ["roles"])
-    .index("by_active_role", ["current_active_role"])
-    .index("by_status", ["account_status"])
-    .index("by_verification", ["verification_level"])
-    .index("by_organizer_status", ["is_organizer"]),
-
-  // ============================================================================
-  // ORGANIZER PROFILES & BUSINESS MANAGEMENT
-  // ============================================================================
-
-  organizer_profiles: defineTable({
-    user_id: v.id("users"), // Links to Convex Auth users table
-
-    // BUSINESS INFORMATION
-    business_name: v.string(),
-    business_type: v.union(
-      v.literal("individual"),
-      v.literal("sole_proprietorship"),
-      v.literal("llc"),
-      v.literal("corporation"),
-      v.literal("nonprofit"),
-      v.literal("partnership"),
-      v.literal("government")
-    ),
-    business_registration_number: v.optional(v.string()),
-    tax_id: v.optional(v.string()),
-
-    // BRANDING & MARKETING
-    display_name: v.string(),
-    bio: v.optional(v.string()),
-    website: v.optional(v.string()),
-    social_media: v.optional(v.object({
-      facebook: v.optional(v.string()),
-      twitter: v.optional(v.string()),
-      instagram: v.optional(v.string()),
-      linkedin: v.optional(v.string()),
-      youtube: v.optional(v.string()),
-      tiktok: v.optional(v.string()),
-    })),
-
-    // MEDIA ASSETS
-    logo_storage_id: v.optional(v.id("_storage")),
-    banner_storage_id: v.optional(v.id("_storage")),
-    brand_colors: v.optional(v.object({
-      primary: v.optional(v.string()),
-      secondary: v.optional(v.string()),
-      accent: v.optional(v.string()),
-    })),
-
-    // BUSINESS ADDRESS & CONTACT
-    business_address: v.object({
-      street: v.optional(v.string()),
-      city: v.string(),
-      state_province: v.string(),
-      postal_code: v.optional(v.string()),
-      country: v.string(),
+    
+    // NOTIFICATIONS
+    notifications: v.object({
+      email: v.boolean(),
+      push: v.boolean(),
+      sms: v.boolean(),
+      marketing: v.boolean(),
     }),
-    business_phone: v.optional(v.string()),
-    business_email: v.optional(v.string()),
 
-    // VERIFICATION & COMPLIANCE
-    verification_status: v.union(v.literal("pending"), v.literal("verified"), v.literal("rejected")),
-    verification_documents: v.optional(v.array(v.object({
-      type: v.string(),
-      storage_id: v.id("_storage"),
-      status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected")),
-      uploaded_at: v.number(),
-    }))),
+    // PRIVACY SETTINGS
+    privacy: v.object({
+      profileVisibility: v.union(v.literal("public"), v.literal("private")),
+      showEmail: v.boolean(),
+      showPhone: v.boolean(),
+    }),
 
-    // FINANCIAL INFORMATION
-    bank_account_verified: v.optional(v.boolean()),
-    payment_methods: v.optional(v.array(v.object({
-      type: v.union(v.literal("bank_account"), v.literal("paypal"), v.literal("stripe")),
-      last_four: v.optional(v.string()),
-      is_default: v.boolean(),
-      added_at: v.number(),
-    }))),
-
-    // SUBSCRIPTION & PLAN
-    subscription_tier: v.union(v.literal("free"), v.literal("basic"), v.literal("pro"), v.literal("enterprise")),
-    subscription_expires_at: v.optional(v.number()),
-
-    // PERFORMANCE METRICS
-    total_events_hosted: v.optional(v.number()),
-    total_tickets_sold: v.optional(v.number()),
-    total_revenue: v.optional(v.number()),
-    average_rating: v.optional(v.number()),
-    total_reviews: v.optional(v.number()),
-
-    // EVENT SPECIALIZATIONS
-    specialties: v.optional(v.array(v.union(
-      v.literal("sports"), v.literal("music"), v.literal("food"),
-      v.literal("travel"), v.literal("technology"), v.literal("arts"),
-      v.literal("business"), v.literal("education"), v.literal("health"),
-      v.literal("entertainment"), v.literal("cultural"), v.literal("religious"),
-      v.literal("networking"), v.literal("fundraising")
-    ))),
-
-    // SETTINGS & PREFERENCES
-    auto_approve_events: v.optional(v.boolean()),
-    default_refund_policy: v.optional(v.string()),
+    // VERIFICATION & STATUS
+    phoneVerified: v.optional(v.boolean()),
+    isActive: v.boolean(),
 
     // TIMESTAMPS
-    created_at: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  }).index("by_user_id", ["userId"]),
+
+  // ============================================================================
+  // ORGANIZER PROFILES - For event organizers
+  // ============================================================================
+  organizer_profiles: defineTable({
+    userId: v.optional(v.id("users")), // Links to Convex Auth users table
+    user_id: v.optional(v.id("users")), // Support old field name
+
+    // BASIC ORGANIZER INFO
+    fullName: v.optional(v.string()),
+    displayName: v.optional(v.string()),
+    display_name: v.optional(v.string()), // Support old field name
+    storeName: v.optional(v.string()),
+    storeDescription: v.optional(v.string()),
+    organizerType: v.optional(v.union(v.literal("individual"), v.literal("business"))),
+
+    // CONTACT & LOCATION
+    phone: v.optional(v.string()),
+    website: v.optional(v.string()),
+    primaryLocation: v.optional(v.string()),
+
+    // BUSINESS DETAILS
+    businessName: v.optional(v.string()),
+    business_name: v.optional(v.string()), // Support old field name
+    businessRegistration: v.optional(v.string()),
+    business_address: v.optional(v.object({
+      street: v.optional(v.string()),
+      city: v.optional(v.string()),
+      state_province: v.optional(v.string()),
+      postal_code: v.optional(v.string()),
+      country: v.optional(v.string()),
+    })),
+    business_type: v.optional(v.string()),
+    subscription_tier: v.optional(v.string()),
+    verification_status: v.optional(v.string()),
+    
+    // PREFERENCES (same as customer_profiles for consistency)
+    language: v.optional(v.string()),
+    timezone: v.optional(v.string()),
+    currency: v.optional(v.string()),
+
+    // NOTIFICATIONS
+    notifications: v.optional(v.object({
+      email: v.boolean(),
+      push: v.boolean(),
+      sms: v.boolean(),
+      marketing: v.boolean(),
+    })),
+
+    // PRIVACY SETTINGS
+    privacy: v.optional(v.object({
+      profileVisibility: v.union(v.literal("public"), v.literal("private")),
+      showEmail: v.boolean(),
+      showPhone: v.boolean(),
+    })),
+
+    // VERIFICATION & STATUS
+    isVerified: v.optional(v.boolean()),
+    isActive: v.optional(v.boolean()),
+
+    // TIMESTAMPS (support both old and new field names)
+    createdAt: v.optional(v.number()),
+    created_at: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
     updated_at: v.optional(v.number()),
   })
-    .index("by_user_id", ["user_id"])
-    .index("by_status", ["verification_status"])
-    .index("by_tier", ["subscription_tier"])
-    .index("by_specialties", ["specialties"])
-    .index("by_rating", ["average_rating"]),
+    .index("by_user_id", ["userId"])
+    .index("by_old_user_id", ["user_id"]),
 
   // ============================================================================
   // EVENTS MANAGEMENT
@@ -1669,5 +1625,63 @@ export default defineSchema({
     .index("by_booking", ["booking_id"])
     .index("by_user", ["user_id"])
     .index("by_expires_at", ["cache_expires_at"]),
+
+  // ============================================================================
+  // SYSTEM CONFIGURATION - Dynamic configuration management
+  // ============================================================================
+  system_configs: defineTable({
+    // Configuration identification
+    config_key: v.string(), // e.g., "malaysian_states", "event_categories", "user_roles"
+    category: v.string(), // e.g., "location", "event", "user", "system"
+    
+    // Configuration data
+    name: v.string(), // Display name
+    description: v.optional(v.string()),
+    config_data: v.any(), // JSON object containing the configuration values
+    
+    // Configuration metadata
+    is_active: v.boolean(),
+    is_system_config: v.boolean(), // true for system configs, false for user-customizable
+    version: v.number(),
+    
+    // Access control
+    editable_by_admin: v.boolean(),
+    editable_by_organizer: v.boolean(),
+    
+    // Timestamps
+    created_at: v.number(),
+    updated_at: v.optional(v.number()),
+    created_by: v.optional(v.id("users")),
+    updated_by: v.optional(v.id("users")),
+  })
+    .index("by_config_key", ["config_key"])
+    .index("by_category", ["category"])
+    .index("by_active", ["is_active"])
+    .index("by_system", ["is_system_config"]),
+
+  // ============================================================================
+  // CONFIG HISTORY - Track configuration changes
+  // ============================================================================
+  config_history: defineTable({
+    config_id: v.id("system_configs"),
+    config_key: v.string(),
+    
+    // Change details
+    action: v.union(v.literal("created"), v.literal("updated"), v.literal("deleted"), v.literal("activated"), v.literal("deactivated")),
+    old_data: v.optional(v.any()),
+    new_data: v.optional(v.any()),
+    change_reason: v.optional(v.string()),
+    
+    // User who made the change
+    changed_by: v.id("users"),
+    changed_at: v.number(),
+    
+    // Version tracking
+    version_before: v.optional(v.number()),
+    version_after: v.number(),
+  })
+    .index("by_config", ["config_id"])
+    .index("by_user", ["changed_by"])
+    .index("by_date", ["changed_at"]),
 
 });

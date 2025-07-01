@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useConvexAuth } from "convex/react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { AddressForm, AddressFormData } from "@/components/checkout/AddressForm"
 import { ShippingOptions, ShippingOption } from "@/components/checkout/ShippingOptions";
 import CheckoutLayout from "@/components/checkout/CheckoutLayout";
 import { ArrowLeft, User, Package, CreditCard } from "lucide-react";
+import Spinner from "@/components/Spinner";
 
 interface CartItem {
   id: string;
@@ -24,7 +25,7 @@ interface CartItem {
   requiresShipping?: boolean;
 }
 
-export default function CheckoutDetailsPage() {
+function CheckoutDetailsPageContent() {
   const { isLoading } = useConvexAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -354,4 +355,12 @@ export default function CheckoutDetailsPage() {
       </div>
     </CheckoutLayout>
   );
-} 
+}
+
+export default function CheckoutDetailsPage() {
+  return (
+    <Suspense fallback={<Spinner fullScreen />}>
+      <CheckoutDetailsPageContent />
+    </Suspense>
+  );
+}

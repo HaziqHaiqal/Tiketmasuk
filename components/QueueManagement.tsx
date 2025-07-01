@@ -35,7 +35,7 @@ export default function QueueManagement({ eventId, ticketCategoryId, userId }: Q
   );
 
   // Get current user profile for email
-  const currentUser = useQuery(api.users.current);
+  const currentUser = useQuery(api.users.getCurrentUser);
 
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
 

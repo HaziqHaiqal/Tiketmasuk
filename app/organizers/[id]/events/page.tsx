@@ -17,8 +17,8 @@ interface OrganizerEventsPageProps {
 }
 
 function OrganizerEventsContent({ organizerId }: { organizerId: string }) {
-  const organizer = useQuery(api.organizers.getProfileWithImages, {
-    organizer_id: organizerId as Id<"organizer_profiles">,
+  const organizer = useQuery(api.organizers.getProfile, {
+    organizerId: organizerId as Id<"organizer_profiles">,
   });
 
   const organizerEvents = useQuery(api.events.getByOrganizer, {
@@ -39,7 +39,7 @@ function OrganizerEventsContent({ organizerId }: { organizerId: string }) {
             className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
-            Back to {organizer?.display_name || 'Organizer'}
+            Back to {organizer?.displayName || 'Organizer'}
           </Link>
         </div>
 
@@ -52,7 +52,7 @@ function OrganizerEventsContent({ organizerId }: { organizerId: string }) {
             <div>
               {organizer ? (
                 <>
-                  <h1 className="text-3xl font-bold text-gray-900">{organizer.display_name}</h1>
+                  <h1 className="text-3xl font-bold text-gray-900">{organizer.displayName}</h1>
                   <p className="text-gray-600">Events & Experiences</p>
                 </>
               ) : (
@@ -150,7 +150,7 @@ function OrganizerEventsContent({ organizerId }: { organizerId: string }) {
                 <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-xl font-medium text-gray-900 mb-2">No events yet</h3>
                 <p className="text-gray-600">
-                  {organizer?.display_name || 'This organizer'} hasn't created any events yet. Check back later for upcoming events!
+                  {organizer?.displayName || 'This organizer'} hasn't created any events yet. Check back later for upcoming events!
                 </p>
               </div>
             )}

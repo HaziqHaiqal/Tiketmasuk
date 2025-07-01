@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import Image from "next/image";
-import { Eye, EyeOff, Mail, Lock, User, Check, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, Check, ArrowRight, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import logo from "@/images/tiketmasuk-logo-dark.png";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useOrganizerTypes, transformOrganizerTypesForSelect, FALLBACK_ORGANIZER_TYPES } from "@/lib/configUtils";
 
 interface RegisterModalProps {
   open: boolean;
@@ -25,12 +27,22 @@ interface RegisterModalProps {
   onSwitchToLogin?: () => void;
 }
 
+// Multi-step registration flow
+type RegistrationStep = "form" | "verification" | "complete";
+
 export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterModalProps) {
   const { signIn } = useAuthActions();
+  
+  // Get dynamic configurations
+  const organizerTypes = useOrganizerTypes();
+  const availableOrganizerTypes = organizerTypes || FALLBACK_ORGANIZER_TYPES;
+  
+  const [step, setStep] = useState<RegistrationStep>("form");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
@@ -45,7 +57,11 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
   const [displayName, setDisplayName] = useState("");
   const [storeName, setStoreName] = useState("");
   const [storeDescription, setStoreDescription] = useState("");
-  const [organizerType, setOrganizerType] = useState<"individual" | "group" | "organization" | "business">("individual");
+  const [organizerType, setOrganizerType] = useState(
+    typeof availableOrganizerTypes[0] === 'string' 
+      ? availableOrganizerTypes[0] 
+      : availableOrganizerTypes[0]?.key || "individual"
+  );
   const [primaryLocation, setPrimaryLocation] = useState("");
   const [phone, setPhone] = useState("");
   const [website, setWebsite] = useState("");
@@ -124,6 +140,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
     }
 
     try {
+      // Step 1: Initiate sign up with verification requirement
       await signIn("password", {
         email,
         password,
@@ -144,21 +161,78 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
         }),
         flow: "signUp"
       });
-      onOpenChange(false);
-      // Reset form
-      resetForm();
-    } catch (err) {
-      setError("Failed to create account. Please try again.");
+      
+      // After initiating signup, move to verification step
+      setStep("verification");
+    } catch (err: any) {
+      console.error("Sign up error:", err);
+      if (err.message?.includes("verification")) {
+        // If error mentions verification, still proceed to verification step
+        setStep("verification");
+      } else {
+        setError(err.message || "Failed to create account. Please try again.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    if (!verificationCode.trim()) {
+      setError("Please enter the verification code.");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      await signIn("password", {
+        email,
+        code: verificationCode,
+        flow: "email-verification"
+      });
+      
+      setStep("complete");
+      setTimeout(() => {
+        onOpenChange(false);
+        resetForm();
+      }, 2000);
+    } catch (err: any) {
+      console.error("Verification error:", err);
+      setError(err.message || "Invalid verification code. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    setIsLoading(true);
+    setError("");
+
+    try {
+      await signIn("password", {
+        email,
+        flow: "signUp"
+      });
+      setError(""); // Clear any previous errors
+    } catch (err: any) {
+      console.error("Resend error:", err);
+      setError("Failed to resend verification code. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
   const resetForm = () => {
+    setStep("form");
     setName("");
     setEmail("");
     setPassword("");
     setConfirmPassword("");
+    setVerificationCode("");
     setAcceptTerms(false);
     setFullName("");
     setDisplayName("");
@@ -169,6 +243,7 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
     setWebsite("");
     setBusinessName("");
     setBusinessRegistration("");
+    setError("");
   };
 
   const handleGoogleSignUp = async () => {
@@ -202,6 +277,141 @@ export function RegisterModal({ open, onOpenChange, onSwitchToLogin }: RegisterM
     onSwitchToLogin?.();
   };
 
+  const handleBackToForm = () => {
+    setStep("form");
+    setVerificationCode("");
+    setError("");
+  };
+
+  // Render verification step
+  if (step === "verification") {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="w-[90vw] max-w-md max-h-[90vh] overflow-y-auto !bg-white !border-0 !shadow-2xl !rounded-2xl !p-0 gap-0">
+          {/* Header */}
+          <div className="bg-gradient-to-br from-green-600 via-blue-600 to-purple-600 p-8 rounded-t-2xl">
+            <DialogHeader className="text-center space-y-3">
+              <DialogTitle className="text-2xl font-bold text-white text-center">
+                Check Your Email 📧
+              </DialogTitle>
+              <DialogDescription className="text-green-100 text-base text-center">
+                We've sent a verification code to {email}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          {/* Verification Form */}
+          <div className="p-8 space-y-6">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Mail className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Enter Verification Code</h3>
+              <p className="text-gray-600 text-sm">
+                Please enter the 6-digit code we sent to your email address
+              </p>
+            </div>
+
+            <form onSubmit={handleVerifyEmail} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="verificationCode" className="text-sm font-semibold text-gray-700">
+                  Verification Code
+                </Label>
+                <Input
+                  id="verificationCode"
+                  type="text"
+                  placeholder="Enter 6-digit code"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="h-12 border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl transition-all duration-200 text-center text-2xl font-mono tracking-wider"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  required
+                />
+              </div>
+
+              {error && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+                  {error}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                disabled={isLoading || verificationCode.length !== 6}
+              >
+                {isLoading ? (
+                  <div className="flex items-center">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3" />
+                    Verifying...
+                  </div>
+                ) : (
+                  "Verify Email"
+                )}
+              </Button>
+            </form>
+
+            <div className="text-center space-y-3">
+              <p className="text-gray-600 text-sm">
+                Didn't receive the code?{" "}
+                <button
+                  onClick={handleResendCode}
+                  disabled={isLoading}
+                  className="text-blue-600 hover:text-blue-700 font-semibold hover:underline"
+                >
+                  Resend code
+                </button>
+              </p>
+              
+              <button
+                onClick={handleBackToForm}
+                className="flex items-center justify-center w-full text-gray-600 hover:text-gray-700 font-medium"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to registration
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Render completion step
+  if (step === "complete") {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="w-[90vw] max-w-md max-h-[90vh] overflow-y-auto !bg-white !border-0 !shadow-2xl !rounded-2xl !p-0 gap-0">
+          {/* Header */}
+          <div className="bg-gradient-to-br from-green-600 via-emerald-600 to-teal-600 p-8 rounded-t-2xl">
+            <DialogHeader className="text-center space-y-3">
+              <DialogTitle className="text-2xl font-bold text-white text-center">
+                Welcome to Tiketmasuk! 🎉
+              </DialogTitle>
+              <DialogDescription className="text-green-100 text-base text-center">
+                Your account has been successfully created
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          {/* Success Message */}
+          <div className="p-8 text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Check className="w-8 h-8 text-green-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Account Created Successfully!</h3>
+            <p className="text-gray-600 text-sm mb-6">
+              You can now start {accountType === "organizer" ? "creating amazing events" : "discovering incredible events"}
+            </p>
+            <div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Render main registration form
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[90vw] max-w-lg max-h-[90vh] overflow-y-auto !bg-white !border-0 !shadow-2xl !rounded-2xl !p-0 gap-0">
